@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f1e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="闲来一卦 — 随缘起卦，静观天机。灵感源自《易经》六十四卦，仅供文化欣赏与娱乐参考。">
+<title>闲来一卦</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/avatar.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/avatar.png">
+<style>
+/* ============================================================
+   基础（源自小程序 app.wxss）
+   ============================================================ */
+:root {
+  --bg: #f5f1e8; --ink: #2b2b2b; --muted: #8a8578; --accent: #b03a2e;
+  --body: #4a463d; --faint: #b8b2a2; --fainter: #c9c3b3; --line: #d8d2c2;
+}
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+}
+* { box-sizing: border-box; }
+body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+button { font-family: inherit; background: none; border: none; padding: 0; cursor: pointer; color: inherit; }
+
+/* ============================================================
+   三态容器（原 wxml wx:if / wx:elif / wx:else）
+   ============================================================ */
+.view { display: none; min-height: 100vh; min-height: 100dvh; }
+.view.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#view-result.active { display: block; }
+#view-casting { position: relative; }
+
+/* ============================================================
+   主页态（源自 index.wxss .idle/.coin-*，rpx 已按 750 设计宽换算为 px）
+   ============================================================ */
+.coin-ring {
+  width: 110px; height: 110px; border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 7px rgba(43, 43, 43, 0.04);
+}
+.coin-char { font-size: 48px; color: var(--ink); letter-spacing: 0; }
+.idle-tip { margin-top: 28px; font-size: 13px; color: var(--muted); letter-spacing: 6px; text-indent: 6px; }
+
+/* ============================================================
+   起卦动画（源自 index.wxss .casting/.ripple/.casting-text）
+   ============================================================ */
+.ripple {
+  position: absolute; width: 110px; height: 110px; border-radius: 50%;
+  border: 1px solid var(--ink); opacity: 0;
+  animation: ripple 1.2s ease-out infinite;
+}
+.ripple-delay { animation-delay: 0.6s; }
+@keyframes ripple {
+  0%   { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.casting-text {
+  font-size: 15px; color: var(--muted);
+  letter-spacing: 8px; text-indent: 8px;
+  animation: breathe 1.2s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* ============================================================
+   结果态（源自 index.wxss .result 及以下）
+   ============================================================ */
+.result-inner {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 32px 32px 48px; /* 顶部由安全区适配覆盖 */
+  box-sizing: border-box;
+}
+@supports (padding: env(safe-area-inset-top)) {
+  /* 刘海屏 / PWA 全屏下避让状态栏；普通浏览器标签页内为 0，用 max() 兜底 */
+  .result-inner { padding-top: max(env(safe-area-inset-top), 32px); }
+}
+.gua-lines { margin-bottom: 36px; }
+.line-row { display: flex; align-items: center; margin-bottom: 14px; }
+.line-row:last-child { margin-bottom: 0; }
+.yao { width: 120px; height: 9px; display: flex; align-items: center; }
+.seg { background: var(--ink); height: 9px; border-radius: 1px; }
+.seg-full { width: 120px; }
+.seg-half { width: 54px; }
+.seg-gap { width: 12px; height: 9px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 12px; }
+.gua-name { font-size: 32px; color: var(--ink); letter-spacing: 8px; text-indent: 8px; margin-bottom: 8px; }
+.gua-sub { font-size: 12px; color: var(--muted); letter-spacing: 2px; margin-bottom: 32px; }
+.guaci { font-size: 15px; color: var(--ink); letter-spacing: 2px; margin-bottom: 20px; text-align: center; line-height: 1.9; }
+.image { font-size: 15px; color: var(--body); line-height: 2.1; letter-spacing: 1px; text-align: center; margin-bottom: 20px; }
+.hint { font-size: 14px; color: var(--accent); letter-spacing: 1px; margin-bottom: 28px; text-align: center; line-height: 1.9; }
+.changed { font-size: 13px; color: var(--muted); letter-spacing: 3px; margin-bottom: 24px; }
+.aura { font-size: 11px; color: var(--faint); letter-spacing: 1.5px; margin-bottom: 16px; text-align: center; }
+.disclaimer { font-size: 10px; color: var(--fainter); letter-spacing: 1px; margin-bottom: 28px; text-align: center; }
+
+/* 按钮：再占一卦 / 分享 */
+.again {
+  font-size: 13px; color: var(--muted); letter-spacing: 4px; text-indent: 4px;
+  border: 1px solid var(--line); border-radius: 24px; padding: 10px 28px;
+}
+.again:active { background: rgba(43, 43, 43, 0.05); }
+.share-btn {
+  margin-top: 16px; font-size: 13px; color: #fff; background: var(--accent);
+  letter-spacing: 4px; text-indent: 4px; border-radius: 24px; padding: 10px 28px;
+}
+.share-btn:active { opacity: 0.85; }
+
+/* ============================================================
+   Toast（网页版新增：分享降级提示）
+   ============================================================ */
+#toast {
+  position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%);
+  background: rgba(43, 43, 43, 0.85); color: #f5f1e8; font-size: 13px;
+  padding: 10px 18px; border-radius: 20px; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s; z-index: 99; max-width: 80vw;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- 主页态：一枚「卦」字按钮 -->
+    <div id="view-idle" class="view idle active">
+      <div id="btn-cast" class="coin-ring" role="button" aria-label="起卦">
+        <div class="coin-char">卦</div>
+      </div>
+      <div class="idle-tip">随缘一触</div>
+    </div>
+
+    <!-- 起卦动画 -->
+    <div id="view-casting" class="view casting">
+      <div class="ripple"></div>
+      <div class="ripple ripple-delay"></div>
+      <div class="casting-text">凝神</div>
+    </div>
+
+    <!-- 结果态 -->
+    <div id="view-result" class="view result">
+      <div class="result-inner">
+        <!-- 六爻爻线（自上而下，由 JS 渲染） -->
+        <div id="gua-lines" class="gua-lines"></div>
+
+        <div id="gua-name" class="gua-name"></div>
+        <div id="gua-sub" class="gua-sub"></div>
+        <div id="guaci" class="guaci"></div>
+        <div id="image" class="image"></div>
+        <div id="hint" class="hint"></div>
+
+        <!-- 变卦 -->
+        <div id="changed" class="changed"></div>
+
+        <!-- 天时地气 -->
+        <div id="aura" class="aura"></div>
+
+        <div class="disclaimer">灵感源自《易经》六十四卦，仅供文化欣赏与娱乐参考</div>
+
+        <button id="btn-again" class="again">再占一卦</button>
+        <button id="btn-share" class="share-btn">分享</button>
+      </div>
+    </div>
+
+  </div>
+  <div id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict'
+
+  /* ====================================================================
+   * ① 八卦 / 六十四卦数据
+   * 来源：小程序 data/trigrams.js、data/hexagrams.js
+   *       —— 改动小程序数据后，需同步更新此处。
+   * ==================================================================== */
+  const TRIGRAMS = [
+    { name: '坤', nature: '地' },
+    { name: '震', nature: '雷' },
+    { name: '坎', nature: '水' },
+    { name: '兑', nature: '泽' },
+    { name: '艮', nature: '山' },
+    { name: '离', nature: '火' },
+    { name: '巽', nature: '风' },
+    { name: '乾', nature: '天' }
+  ]
+
+  const HEXAGRAMS = {
+    '77': { id: 1, name: '乾为天', short: '乾', pinyin: 'qián', guaci: '元亨利贞。', image: '六龙行天，星野无垠。刚健之气周流不息，如昼夜不舍，如江河不返。', hint: '行你所信，不必回头。' },
+    '00': { id: 2, name: '坤为地', short: '坤', pinyin: 'kūn', guaci: '元亨，利牝马之贞。', image: '大地沉默，承载万物而不言。生养而不居功，厚载而不求报。', hint: '以柔承事，慢即是稳。' },
+    '21': { id: 3, name: '水雷屯', short: '屯', pinyin: 'zhūn', guaci: '元亨利贞，勿用有攸往，利建侯。', image: '春雷动于深水之下，草木破土前最黑的那一刻。难，恰是生机最盛处。', hint: '草创之时，宜扎根，不宜张扬。' },
+    '42': { id: 4, name: '山水蒙', short: '蒙', pinyin: 'méng', guaci: '亨。匪我求童蒙，童蒙求我。', image: '山泉初出，雾笼深谷。混沌未开之处，恰有可教之机、可启之光。', hint: '承认自己不知道，是知的开始。' },
+    '27': { id: 5, name: '水天需', short: '需', pinyin: 'xū', guaci: '有孚，光亨，贞吉。利涉大川。', image: '云聚于天，雨意已浓而雨未落。等待不是停滞，是天地在蓄势。', hint: '且饮且等，雨自会来。' },
+    '72': { id: 6, name: '天水讼', short: '讼', pinyin: 'sòng', guaci: '有孚窒惕，中吉。利见大人，不利涉大川。', image: '天向上行，水往下流，背道而驰。争执生于各执一端，两不相让。', hint: '退一步看清全局，胜负不如和解。' },
+    '02': { id: 7, name: '地水师', short: '师', pinyin: 'shī', guaci: '贞，丈人吉，无咎。', image: '地中有水，聚众成流。众心齐一，方可兴动大事。', hint: '以正率众，纪律即慈悲。' },
+    '20': { id: 8, name: '水地比', short: '比', pinyin: 'bì', guaci: '吉。原筮元永贞，无咎。', image: '水行地上，亲附无间，百川就下而终归一处。', hint: '靠近让你安定的人与事。' },
+    '67': { id: 9, name: '风天小畜', short: '小畜', pinyin: 'xiǎo xù', guaci: '亨。密云不雨，自我西郊。', image: '风行天上，密云西来而不雨。积蓄尚小，未到大用之时。', hint: '蓄力于微处，勿求速成。' },
+    '73': { id: 10, name: '天泽履', short: '履', pinyin: 'lǚ', guaci: '履虎尾，不咥人，亨。', image: '行于虎尾之后，险地当前。以礼自持，虎亦不咥。', hint: '心存敬畏，步履自安。' },
+    '07': { id: 11, name: '地天泰', short: '泰', pinyin: 'tài', guaci: '小往大来，吉亨。', image: '天地交而万物通，上下和而志同。通衢大开之日。', hint: '通则不痛，打开通道。' },
+    '70': { id: 12, name: '天地否', short: '否', pinyin: 'pǐ', guaci: '否之匪人，不利君子贞，大往小来。', image: '天地不交，万物不通。闭塞之世，喧哗在外，清静在心。', hint: '收敛锋芒，静待转机。' },
+    '75': { id: 13, name: '天火同人', short: '同人', pinyin: 'tóng rén', guaci: '同人于野，亨。利涉大川，利君子贞。', image: '火光上炎，与天同志。同人于旷野，光明而无私。', hint: '以公心聚人，莫设藩篱。' },
+    '57': { id: 14, name: '火天大有', short: '大有', pinyin: 'dà yǒu', guaci: '元亨。', image: '火在天上，日照四方，万物毕见。丰盛之时，光而不耀。', hint: '丰盛宜分享，独享则衰。' },
+    '04': { id: 15, name: '地山谦', short: '谦', pinyin: 'qiān', guaci: '亨，君子有终。', image: '高山藏于大地之下。真正的丰盈，从不外露。', hint: '低头不是认输，是蓄德。' },
+    '10': { id: 16, name: '雷地豫', short: '豫', pinyin: 'yù', guaci: '利建侯行师。', image: '雷出地奋，草木欣荣，万物和乐。顺时而动，如春水涣然。', hint: '顺势而动，但不可沉溺安逸。' },
+    '31': { id: 17, name: '泽雷随', short: '随', pinyin: 'suí', guaci: '元亨利贞，无咎。', image: '泽中有雷，雷入泽中而安。随时而动，日暮而息。', hint: '择善而随，随而不失其主。' },
+    '46': { id: 18, name: '山风蛊', short: '蛊', pinyin: 'gǔ', guaci: '元亨，利涉大川。先甲三日，后甲三日。', image: '山下有风，物久而生蛊。积弊已深，正待整治刷新。', hint: '直面积弊，刮骨亦是疗伤。' },
+    '03': { id: 19, name: '地泽临', short: '临', pinyin: 'lín', guaci: '元亨利贞。至于八月有凶。', image: '大地俯临深泽，居高而亲下。阳气方长，万物向荣。', hint: '走近些，亲身去看。' },
+    '60': { id: 20, name: '风地观', short: '观', pinyin: 'guān', guaci: '盥而不荐，有孚颙若。', image: '风行地上，周流遍观。仰观俯察，观人亦观己。', hint: '先看清，再行动。' },
+    '51': { id: 21, name: '火雷噬嗑', short: '噬嗑', pinyin: 'shì kè', guaci: '亨。利用狱。', image: '雷电交作，咬合除梗。口中有物，啮而后合。', hint: '咬碎梗阻，勿绕而行。' },
+    '45': { id: 22, name: '山火贲', short: '贲', pinyin: 'bì', guaci: '亨。小利有攸往。', image: '山下有火，草木被其辉。文饰之美，如山映火光。', hint: '修饰有度，本色最贵。' },
+    '40': { id: 23, name: '山地剥', short: '剥', pinyin: 'bō', guaci: '不利有攸往。', image: '山附于地，层层剥落。繁华落尽，枝头硕果仅存。', hint: '守住最后那颗果实。' },
+    '01': { id: 24, name: '地雷复', short: '复', pinyin: 'fù', guaci: '亨。出入无疾，朋来无咎。反复其道，七日来复。', image: '雷在地中，一阳来复。冬至极处，春信已悄然萌动。', hint: '微光已现，静养待时。' },
+    '71': { id: 25, name: '天雷无妄', short: '无妄', pinyin: 'wú wàng', guaci: '元亨利贞。其匪正有眚，不利有攸往。', image: '天下雷行，万物各正性命。不妄为，不妄求，顺天而行。', hint: '莫起妄念，行于正道。' },
+    '47': { id: 26, name: '山天大畜', short: '大畜', pinyin: 'dà xù', guaci: '利贞，不家食吉，利涉大川。', image: '天在山中，至大者藏于至静。蓄德蓄才，厚载而待发。', hint: '大蓄之后，方有大用。' },
+    '41': { id: 27, name: '山雷颐', short: '颐', pinyin: 'yí', guaci: '贞吉。观颐，自求口实。', image: '山下有雷，上止下动，如口之咀嚼。观其所养，可知其人。', hint: '慎言语，节饮食，养正气。' },
+    '36': { id: 28, name: '泽风大过', short: '大过', pinyin: 'dà guò', guaci: '栋桡，利有攸往，亨。', image: '泽水没木，栋梁负重而将倾。非常之时，承压之极。', hint: '非常之局，当行非常之举。' },
+    '22': { id: 29, name: '坎为水', short: '坎', pinyin: 'kǎn', guaci: '习坎，有孚，维心亨，行有尚。', image: '水流而不盈，行险而不失其信。重重险陷，水自向前。', hint: '心有常德，险亦可涉。' },
+    '55': { id: 30, name: '离为火', short: '离', pinyin: 'lí', guaci: '利贞，亨。畜牝牛，吉。', image: '日月丽天，百谷草木丽乎土。光明相续，依附而生辉。', hint: '找到值得依附的根本，光才持久。' },
+    '34': { id: 31, name: '泽山咸', short: '咸', pinyin: 'xián', guaci: '亨，利贞，取女吉。', image: '山上有泽，以虚受人。少男居少女之下，二气感应而通。', hint: '虚心感应，真情自通。' },
+    '16': { id: 32, name: '雷风恒', short: '恒', pinyin: 'héng', guaci: '亨，无咎，利贞，利有攸往。', image: '雷风相与，动而不穷。久于其道，终则有始。', hint: '恒不是不动，是有常的变。' },
+    '74': { id: 33, name: '天山遁', short: '遁', pinyin: 'dùn', guaci: '亨，小利贞。', image: '天下有山，山高而天远。阴长阳消，急流勇退之时。', hint: '退，是另一种进。' },
+    '17': { id: 34, name: '雷天大壮', short: '大壮', pinyin: 'dà zhuàng', guaci: '利贞。', image: '雷在天上，声威正隆。壮盛之极，须防恃强而动。', hint: '壮而守礼，强而不逞。' },
+    '50': { id: 35, name: '火地晋', short: '晋', pinyin: 'jìn', guaci: '康侯用锡马蕃庶，昼日三接。', image: '明出地上，旭日东升。柔进而上行，光华渐盛。', hint: '如朝阳渐升，不必一跃。' },
+    '05': { id: 36, name: '地火明夷', short: '明夷', pinyin: 'míng yí', guaci: '利艰贞。', image: '明入地中，光藏于暗。晦其明而自守，如文王囚羑里。', hint: '暗夜韬光，内明外顺。' },
+    '65': { id: 37, name: '风火家人', short: '家人', pinyin: 'jiā rén', guaci: '利女贞。', image: '风自火出，由内及外。家有常道，言有物而行有恒。', hint: '先正家风，再谈外事。' },
+    '53': { id: 38, name: '火泽睽', short: '睽', pinyin: 'kuí', guaci: '小事吉。', image: '火炎上，泽润下，两相乖离。异中有同，二女同居而志不同。', hint: '分歧之中，先寻小事的共识。' },
+    '24': { id: 39, name: '水山蹇', short: '蹇', pinyin: 'jiǎn', guaci: '利西南，不利东北；利见大人，贞吉。', image: '前有险水，后有大山，进退两难。见险而能止，知矣哉。', hint: '见险止步，反身修德，寻求援手。' },
+    '12': { id: 40, name: '雷水解', short: '解', pinyin: 'jiě', guaci: '利西南，无所往，其来复吉。', image: '雷雨交作，冰封乍裂。郁结既散，万物舒缓。', hint: '赦过宥罪，及时化解，宜早不宜迟。' },
+    '43': { id: 41, name: '山泽损', short: '损', pinyin: 'sǔn', guaci: '有孚，元吉，无咎，可贞，利有攸往。', image: '山下有泽，损深以增山之高。减损亦是修行。', hint: '有舍才有得，诚心微礼胜厚供。' },
+    '61': { id: 42, name: '风雷益', short: '益', pinyin: 'yì', guaci: '利有攸往，利涉大川。', image: '风雷相助，风烈则雷迅，雷激则风怒。损上益下，其道大光。', hint: '见善则迁，有过则改。' },
+    '37': { id: 43, name: '泽天夬', short: '夬', pinyin: 'guài', guaci: '扬于王庭，孚号，有厉。', image: '泽上于天，决堤而下。以刚决柔，当断之时。', hint: '当断则断，但以温和宣告。' },
+    '76': { id: 44, name: '天风姤', short: '姤', pinyin: 'gòu', guaci: '女壮，勿用取女。', image: '天下有风，无物不遇。不期而遇，一阴始生于下。', hint: '相遇皆有因缘，慎其所始。' },
+    '30': { id: 45, name: '泽地萃', short: '萃', pinyin: 'cuì', guaci: '亨。王假有庙，利见大人。', image: '泽上于地，百川荟萃。聚众成泽之时，亦须防聚而生乱。', hint: '以正聚众，祭如在。' },
+    '06': { id: 46, name: '地风升', short: '升', pinyin: 'shēng', guaci: '元亨，用见大人，勿恤，南征吉。', image: '地中生木，柔以时升。木长于土，日渐高大而不自知。', hint: '积小以高大，南行遇贵。' },
+    '32': { id: 47, name: '泽水困', short: '困', pinyin: 'kùn', guaci: '亨，贞，大人吉，无咎，有言不信。', image: '泽无水，水漏于下，泽涸于上。身处绝境，言而不信之时。', hint: '困而不失其所亨，其唯君子乎。' },
+    '26': { id: 48, name: '水风井', short: '井', pinyin: 'jǐng', guaci: '改邑不改井，无丧无得，往来井井。', image: '木上有水，井养而不穷。城邑可改，井不可迁。', hint: '做那口井：守常，而养人。' },
+    '35': { id: 49, name: '泽火革', short: '革', pinyin: 'gé', guaci: '巳日乃孚，元亨利贞，悔亡。', image: '泽中有火，水火相息。变革之时，如兽之换毛。', hint: '顺天应人，革而当，其悔乃亡。' },
+    '56': { id: 50, name: '火风鼎', short: '鼎', pinyin: 'dǐng', guaci: '元吉，亨。', image: '木上有火，鼎烹之象。三足而立，稳重以取新。', hint: '正位凝命，调和鼎鼐。' },
+    '11': { id: 51, name: '震为雷', short: '震', pinyin: 'zhèn', guaci: '亨。震来虩虩，笑言哑哑。', image: '洊雷相继，震惊百里。雷动之时，不丧匕鬯。', hint: '临危不乱，恐惧修省。' },
+    '44': { id: 52, name: '艮为山', short: '艮', pinyin: 'gèn', guaci: '艮其背，不获其身，行其庭，不见其人，无咎。', image: '两山并立，寂然不动。止其所当止，思不出其位。', hint: '当止则止，静中生定。' },
+    '64': { id: 53, name: '风山渐', short: '渐', pinyin: 'jiàn', guaci: '女归吉，利贞。', image: '山上有木，渐进有序。木长于山，其高以渐。', hint: '循序渐进，如女归之吉。' },
+    '13': { id: 54, name: '雷泽归妹', short: '归妹', pinyin: 'guī mèi', guaci: '征凶，无攸利。', image: '泽上有雷，少女从长男。情动而位不正，悦而动之失。', hint: '名分不正，行则多咎，宜守常分。' },
+    '15': { id: 55, name: '雷火丰', short: '丰', pinyin: 'fēng', guaci: '亨，王假之，勿忧，宜日中。', image: '雷电皆至，声势俱盛。日中之光，宜照天下。', hint: '盛极之时勿忧，但日中则昃，珍惜正盛之光。' },
+    '54': { id: 56, name: '火山旅', short: '旅', pinyin: 'lǚ', guaci: '小亨，旅贞吉。', image: '山上有火，过而不留。旅人在途，何处是归程。', hint: '旅中守正，柔顺则吉，莫争莫恋。' },
+    '66': { id: 57, name: '巽为风', short: '巽', pinyin: 'xùn', guaci: '小亨，利有攸往，利见大人。', image: '随风相续，无孔不入。风之行也，卑顺而善入。', hint: '谦逊如风，申命行事。' },
+    '33': { id: 58, name: '兑为泽', short: '兑', pinyin: 'duì', guaci: '亨，利贞。', image: '两泽相丽，互相滋益。朋友讲习，和悦相感。', hint: '和悦以感人，亦防悦之过谄。' },
+    '62': { id: 59, name: '风水涣', short: '涣', pinyin: 'huàn', guaci: '亨。王假有庙，利涉大川，利贞。', image: '风行水上，冰释波散。涣散之时，亦是化解之机。', hint: '涣其群，聚人心，可济大难。' },
+    '23': { id: 60, name: '水泽节', short: '节', pinyin: 'jié', guaci: '亨。苦节不可贞。', image: '泽上有水，满则溢之。当止则止，如竹之有节。', hint: '节以制度，甘节则吉，苦节不可久。' },
+    '63': { id: 61, name: '风泽中孚', short: '中孚', pinyin: 'zhōng fú', guaci: '豚鱼吉，利涉大川，利贞。', image: '泽上有风，风感泽受。中虚外实，信及豚鱼。', hint: '诚信在中，虚己感人。' },
+    '14': { id: 62, name: '雷山小过', short: '小过', pinyin: 'xiǎo guò', guaci: '亨，利贞，可小事，不可大事。飞鸟遗之音。', image: '山上有雷，声过而渐微。飞鸟遗音，不宜上，宜下。', hint: '可小事不可大事，宜下不宜上。' },
+    '25': { id: 63, name: '水火既济', short: '既济', pinyin: 'jì jì', guaci: '亨小，利贞，初吉终乱。', image: '水在火上，水火相济，炊爨已成。事已成矣。', hint: '成而思患，防患于未然。' },
+    '52': { id: 64, name: '火水未济', short: '未济', pinyin: 'wèi jì', guaci: '亨，小狐汔济，濡其尾，无攸利。', image: '火在水上，火水不交。小狐渡河，将济而濡尾。事未竟也。', hint: '慎终如始，则未济者终济。' }
+  }
+
+  /* ====================================================================
+   * ② 起卦算法（逐字移植自小程序 utils/*.js，保证结果与小程序一致）
+   * ==================================================================== */
+
+  // utils/seed.js — FNV-1a 字符串哈希
+  function hash(str) {
+    let h = 0x811c9dc5
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i)
+      h = Math.imul(h, 0x01000193)
+    }
+    return h >>> 0
+  }
+
+  // utils/random.js — mulberry32 种子伪随机数发生器，返回 [0, 1)
+  function mulberry32(a) {
+    return function () {
+      a |= 0
+      a = (a + 0x6d2b79f5) | 0
+      let t = Math.imul(a ^ (a >>> 15), 1 | a)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+  }
+
+  // utils/cast.js — 六爻起卦
+  function trigramIndex(bits) {
+    // bits: [下爻, 中爻, 上爻]，阳 true / 阴 false
+    return (bits[0] ? 1 : 0) + (bits[1] ? 2 : 0) + (bits[2] ? 4 : 0)
+  }
+
+  function lookupHexagram(bits) {
+    const lower = trigramIndex(bits.slice(0, 3))
+    const upper = trigramIndex(bits.slice(3, 6))
+    const hex = HEXAGRAMS[`${upper}${lower}`]
+    return {
+      ...hex,
+      upperNature: TRIGRAMS[upper].nature,
+      lowerNature: TRIGRAMS[lower].nature,
+      upperName: TRIGRAMS[upper].name,
+      lowerName: TRIGRAMS[lower].name
+    }
+  }
+
+  function cast(rand) {
+    // 自下而上生成六爻；每爻三掷，2/3 之和为 6/7/8/9
+    const lines = []
+    for (let i = 0; i < 6; i++) {
+      let sum = 0
+      for (let j = 0; j < 3; j++) sum += rand() < 0.5 ? 2 : 3
+      lines.push(sum)
+    }
+
+    const isYang = v => v === 7 || v === 9
+    const isMoving = v => v === 6 || v === 9
+
+    const bits = lines.map(isYang)
+    const hexagram = lookupHexagram(bits)
+
+    const movingCount = lines.filter(isMoving).length
+    let changed = null
+    if (movingCount > 0) {
+      const changedBits = lines.map(v => (isMoving(v) ? !isYang(v) : isYang(v)))
+      changed = lookupHexagram(changedBits)
+    }
+
+    return {
+      // displayLines 按自上而下排列（上爻在前），供界面直接渲染
+      displayLines: lines
+        .map((v, i) => ({ yang: isYang(v), moving: isMoving(v), pos: i + 1 }))
+        .reverse(),
+      hexagram,
+      changed,
+      movingCount
+    }
+  }
+
+  // utils/imagery.js — 天时地气
+  function shichen(date) {
+    const h = date.getHours()
+    const names = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+    return names[Math.floor(((h + 1) % 24) / 2)]
+  }
+
+  const SOLAR_TERMS = [
+    [1, 6, '小寒'], [1, 20, '大寒'], [2, 4, '立春'], [2, 19, '雨水'],
+    [3, 6, '惊蛰'], [3, 21, '春分'], [4, 5, '清明'], [4, 20, '谷雨'],
+    [5, 6, '立夏'], [5, 21, '小满'], [6, 6, '芒种'], [6, 21, '夏至'],
+    [7, 7, '小暑'], [7, 23, '大暑'], [8, 8, '立秋'], [8, 23, '处暑'],
+    [9, 8, '白露'], [9, 23, '秋分'], [10, 8, '寒露'], [10, 23, '霜降'],
+    [11, 8, '立冬'], [11, 22, '小雪'], [12, 7, '大雪'], [12, 22, '冬至']
+  ]
+
+  function jieqi(date) {
+    const m = date.getMonth() + 1
+    const d = date.getDate()
+    let result = '冬至' // 1 月 6 日以前归去年冬至
+    for (const [tm, td, name] of SOLAR_TERMS) {
+      if (m > tm || (m === tm && d >= td)) result = name
+    }
+    return result
+  }
+
+  // 月相（参考朔：2000-01-06 18:14 UTC，朔望月 29.53059 天）
+  function moonPhase(date) {
+    const synodic = 29.53059
+    const ref = Date.UTC(2000, 0, 6, 18, 14)
+    const age = (((date.getTime() - ref) / 86400000) % synodic + synodic) % synodic
+    if (age < 1.8) return '朔月'
+    if (age < 5.5) return '蛾眉月'
+    if (age < 9.2) return '上弦月'
+    if (age < 13.8) return '盈凸月'
+    if (age < 15.7) return '望月'
+    if (age < 21.1) return '亏凸月'
+    if (age < 23.9) return '下弦月'
+    if (age < 27.7) return '残月'
+    return '晦月'
+  }
+
+  function latBand(lat) {
+    if (lat === null || lat === undefined) return '天涯'
+    const a = Math.abs(lat)
+    if (a >= 50) return '朔北'
+    if (a >= 35) return '北地'
+    if (a >= 23) return '中土'
+    return '炎方'
+  }
+
+  function altBand(alt) {
+    if (alt === null || alt === undefined) return '平野'
+    if (alt >= 2000) return '云巅'
+    if (alt >= 800) return '高岗'
+    if (alt >= 100) return '丘陵'
+    if (alt >= 0) return '平野'
+    return '洼地'
+  }
+
+  // loc: { latitude, longitude, altitude }，可为 null
+  function build(date, loc) {
+    const lat = loc && typeof loc.latitude === 'number' ? loc.latitude : null
+    const alt = loc && typeof loc.altitude === 'number' ? loc.altitude : null
+    const parts = {
+      term: jieqi(date),
+      hour: shichen(date),
+      moon: moonPhase(date),
+      lat: latBand(lat),
+      alt: altBand(alt)
+    }
+    // 无定位时不展示方位与地貌，仅呈现天时
+    const place = lat !== null ? ` · ${parts.lat}${parts.alt}` : ''
+    return {
+      parts,
+      code: `${parts.term}|${parts.hour}|${parts.moon}|${parts.lat}|${parts.alt}`,
+      text: `${parts.term} · ${parts.hour}时 · ${parts.moon}${place}`
+    }
+  }
+
+  /* ====================================================================
+   * ③ 页面状态与渲染（原 setData 逻辑）
+   * ==================================================================== */
+  let state = 'idle' // idle | casting | result
+  const app = { displayLines: [], hexagram: null, changed: null, auraText: '' }
+
+  const $ = (id) => document.getElementById(id)
+
+  function setView(next) {
+    state = next
+    ;['idle', 'casting', 'result'].forEach((v) => {
+      $(`view-${v}`).classList.toggle('active', v === next)
+    })
+  }
+
+  // 渲染六爻爻线（对应 wxml wx:for 结构，自上而下）
+  function renderLines(lines) {
+    const box = $('gua-lines')
+    box.innerHTML = ''
+    lines.forEach((item) => {
+      const row = document.createElement('div')
+      row.className = 'line-row'
+      const yao = document.createElement('div')
+      yao.className = 'yao'
+      if (item.yang) {
+        const seg = document.createElement('div')
+        seg.className = 'seg seg-full'
+        yao.appendChild(seg)
+      } else {
+        const a = document.createElement('div'); a.className = 'seg seg-half'
+        const gap = document.createElement('div'); gap.className = 'seg-gap'
+        const b = document.createElement('div'); b.className = 'seg seg-half'
+        yao.appendChild(a); yao.appendChild(gap); yao.appendChild(b)
+      }
+      row.appendChild(yao)
+      if (item.moving) {
+        const dot = document.createElement('div')
+        dot.className = 'dot'
+        row.appendChild(dot)
+      }
+      box.appendChild(row)
+    })
+  }
+
+  function renderResult() {
+    $('gua-name').textContent = app.hexagram.name
+    $('gua-sub').textContent =
+      `${app.hexagram.pinyin} · 上${app.hexagram.upperNature}下${app.hexagram.lowerNature}（${app.hexagram.upperName}${app.hexagram.lowerName}）`
+    $('guaci').textContent = app.hexagram.guaci
+    $('image').textContent = app.hexagram.image
+    $('hint').textContent = `—— ${app.hexagram.hint}`
+    const changed = $('changed')
+    if (app.changed) {
+      changed.textContent = `之 ${app.changed.name}`
+      changed.style.display = ''
+    } else {
+      changed.style.display = 'none'
+    }
+    $('aura').textContent = app.auraText
+  }
+
+  function toast(msg) {
+    const el = $('toast')
+    el.textContent = msg
+    el.classList.add('show')
+    clearTimeout(el._t)
+    el._t = setTimeout(() => el.classList.remove('show'), 1400)
+  }
+
+  /* ====================================================================
+   * ④ 交互（对应原 bindtap 事件）
+   * ==================================================================== */
+  async function onCast() {
+    if (state === 'casting') return
+    setView('casting')
+
+    // 种子构造与小程序完全一致：个人主体定位降级为 null，
+    // [t, null, null, null, aura.code].join('|') = t + "||||" + code
+    const now = new Date()
+    const loc = null
+    const aura = build(now, loc)
+    const seedStr = [
+      now.getTime(),
+      loc && loc.latitude,
+      loc && loc.longitude,
+      loc && loc.altitude,
+      aura.code
+    ].join('|')
+    const rand = mulberry32(hash(seedStr))
+    const result = cast(rand)
+
+    // 起卦动画片刻后展示结果（与小程序一致：1200ms）
+    await new Promise((r) => setTimeout(r, 1200))
+    app.displayLines = result.displayLines
+    app.hexagram = result.hexagram
+    app.changed = result.changed
+    app.auraText = aura.text
+    renderLines(app.displayLines)
+    renderResult()
+    setView('result')
+    window.scrollTo(0, 0)
+  }
+
+  function onAgain() {
+    setView('idle')
+    window.scrollTo(0, 0)
+  }
+
+  // 分享：Web Share API → 剪贴板 → execCommand，三级降级
+  async function onShare() {
+    const title = (state === 'result' && app.hexagram)
+      ? `我卜得「${app.hexagram.name}」${app.changed ? '，动爻已现' : ''}，来闲来一卦看看你的运势`
+      : '闲来一卦 — 随缘起卦，静观天机'
+    const text = (state === 'result' && app.hexagram)
+      ? `我卜得「${app.hexagram.name}」${app.changed ? `，之卦${app.changed.name}` : ''}。${app.hexagram.hint}`
+      : title
+
+    if (navigator.share) {
+      try { await navigator.share({ title, text }); return } catch (e) { /* 用户取消或失败，继续降级 */ }
+    }
+    try { await navigator.clipboard.writeText(text); toast('分享文案已复制'); return } catch (e) { /* 继续降级 */ }
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    try { document.execCommand('copy'); toast('分享文案已复制') }
+    catch (e) { toast('复制失败，请手动复制文案') }
+    ta.remove()
+  }
+
+  $('btn-cast').addEventListener('click', onCast)
+  $('btn-again').addEventListener('click', onAgain)
+  $('btn-share').addEventListener('click', onShare)
+
+  /* ====================================================================
+   * ⑤ PWA：仅在 http(s) 托管环境下注册 Service Worker
+   *    file:// 直接打开时自动跳过（Chrome 禁止 file:// 注册 SW）
+   * ==================================================================== */
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {})
+    })
+  }
+
+  // 调试用：与小程序端到端结果一致性校验入口（发布时可删除）
+  window.__debug = { hash, mulberry32, cast, build, trigramIndex, lookupHexagram }
+})()
+</script>
+</body>
+</html>
