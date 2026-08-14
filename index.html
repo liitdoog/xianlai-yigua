@@ -487,12 +487,26 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
   /* ====================================================================
    * ④ 交互（对应原 bindtap 事件）
    * ==================================================================== */
+
+  // 真随机熵：Web Crypto API（所有现代浏览器可用，file:// 与 https 均有效）
+  // 取 2 个 32 位真随机数转 base36 拼串；无 crypto 时降级 Math.random（仍叠加毫秒时间戳）
+  function randomEntropyStr() {
+    try {
+      if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+        const buf = new Uint32Array(2)
+        window.crypto.getRandomValues(buf)
+        return buf[0].toString(36) + buf[1].toString(36)
+      }
+    } catch (e) { /* 忽略，走降级 */ }
+    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+  }
+
   async function onCast() {
     if (state === 'casting') return
     setView('casting')
 
-    // 种子构造与小程序完全一致：个人主体定位降级为 null，
-    // [t, null, null, null, aura.code].join('|') = t + "||||" + code
+    // 种子 = 时刻 + 天时地气 + 真随机熵（网页版增强，结果不可复现）：
+    // [t, null, null, null, aura.code, 熵].join('|') = t + "||||" + code + "|" + 熵
     const now = new Date()
     const loc = null
     const aura = build(now, loc)
@@ -501,7 +515,8 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
       loc && loc.latitude,
       loc && loc.longitude,
       loc && loc.altitude,
-      aura.code
+      aura.code,
+      randomEntropyStr()
     ].join('|')
     const rand = mulberry32(hash(seedStr))
     const result = cast(rand)
