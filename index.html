@@ -247,7 +247,19 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
 /* ============================================================
    运势（新增）
    ============================================================ */
-.fortune-tabs { width: 100%; max-width: 480px; margin-bottom: 18px; }
+.fortune-tabs { width: 100%; max-width: 480px; margin-bottom: 14px; }
+.focus-row {
+  width: 100%; max-width: 480px;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 18px;
+}
+.focus-row button {
+  font-size: 12px; color: var(--muted); letter-spacing: 2px;
+  border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px;
+}
+.focus-row button.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+.focus-row button:active { opacity: 0.6; }
+.fortune-advice.focus-advice { border-left: 3px solid var(--accent); }
 .fpanel { display: none; width: 100%; max-width: 480px; }
 .fpanel.active { display: block; }
 .fnav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
@@ -428,6 +440,13 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
           <button data-tab="daily" class="active">每日</button>
           <button data-tab="monthly">每月</button>
           <button data-tab="yearly">流年</button>
+        </div>
+        <div class="focus-row" id="focus-row">
+          <button data-focus="all" class="active">综合</button>
+          <button data-focus="career">事业</button>
+          <button data-focus="wealth">财运</button>
+          <button data-focus="love">情感</button>
+          <button data-focus="health">健康</button>
         </div>
         <div id="fortune-daily" class="fpanel active"></div>
         <div id="fortune-monthly" class="fpanel"></div>
@@ -1289,10 +1308,11 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     return '东'
   }
 
-  // 吉凶评分（娱乐级综合）
-  function fortuneScore(disk, flow, extra) {
+  // 吉凶评分（娱乐级综合，可带侧重）
+  function fortuneScore(disk, flow, extra, focus) {
     let score = 60
     const fg = flow.gan, fz = flow.zhi
+    const tg = shiShen(disk.dayGan, fg)
     const fEl = STEM_EL[fg]
     if (disk.xiyong.xi.indexOf(ELEMENTS[fEl]) >= 0) score += 8
     else if (disk.xiyong.ji.indexOf(ELEMENTS[fEl]) >= 0) score -= 8
@@ -1308,10 +1328,73 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
       if (ke(fzEl, xe)) score -= 5
     })
     if (extra && extra.jianchu) {
-      const huang = ['除', '危', '定', '执', '成', '开']
-      score += (huang.indexOf(extra.jianchu.name) >= 0) ? 3 : -3
+      score += (['除', '危', '定', '执', '成', '开'].indexOf(extra.jianchu.name) >= 0) ? 3 : -3
+    }
+    // 侧重加成
+    if (focus && focus !== 'all') {
+      const wm = focusTenGodWeight(disk, focus)
+      score += (wm[tg] || 0)
+      if (focus === 'love') {
+        if (HE6[fz] === disk.pillars.day.zhi) score += 8
+        if (CHONG[fz] === disk.pillars.day.zhi) score -= 8
+      } else if (focus === 'health') {
+        if (ke(fzEl, STEM_EL[disk.dayGan])) score -= 10
+        if (sheng(fzEl, STEM_EL[disk.dayGan])) score += 4
+      }
     }
     return Math.max(0, Math.min(100, Math.round(score)))
+  }
+  const FOCUS_LABEL = { all: '综合', career: '事业', wealth: '财运', love: '情感', health: '健康' }
+  // 侧重对应的十神权重（事业/财运/健康中性；情感按性别取配偶星）
+  function focusTenGodWeight(disk, focus) {
+    const isMale = disk.birth.gender === 'male'
+    const maps = {
+      career: { '正官': 10, '七杀': 8, '正印': 6, '偏印': 4, '比肩': 4, '劫财': 2, '食神': 2, '伤官': -6, '正财': 3, '偏财': 3 },
+      wealth: { '正财': 10, '偏财': 10, '食神': 5, '伤官': 5, '正官': 3, '七杀': 2, '正印': 3, '偏印': 2, '比肩': -6, '劫财': -8 },
+      love: isMale
+        ? { '正财': 10, '偏财': 8, '食神': 3, '伤官': -5, '正官': 2, '七杀': 1, '比肩': 1, '劫财': 3, '正印': 2, '偏印': 1 }
+        : { '正官': 10, '七杀': 8, '正印': 2, '偏印': 1, '比肩': 1, '劫财': 3, '食神': 3, '伤官': -5, '正财': 2, '偏财': 1 },
+      health: { '正印': 5, '偏印': 4, '比肩': 3, '劫财': 2, '食神': 3, '伤官': -5, '正官': -2, '七杀': -6, '正财': -2, '偏财': -4 }
+    }
+    return maps[focus]
+  }
+  // 侧重解析文案
+  function focusAdvice(disk, flow, focus) {
+    const tg = shiShen(disk.dayGan, flow.gan)
+    const fz = flow.zhi
+    const fzEl = BRANCH_EL[fz]
+    const de = STEM_EL[disk.dayGan]
+    const isMale = disk.birth.gender === 'male'
+    const spouseGods = isMale ? ['正财', '偏财'] : ['正官', '七杀']
+    if (focus === 'career') {
+      if (['正官', '七杀'].indexOf(tg) >= 0) return '官杀主事，事业上有担当与推进之机，宜把握正职与项目机会。'
+      if (tg === '正印' || tg === '偏印') return '印星照拂，多思多学易得贵人指点，宜进修充电、稳固根基。'
+      if (tg === '比肩' || tg === '劫财') return '比劫当值，宜团队协作、并肩推进，忌单打独斗、争强好胜。'
+      if (tg === '伤官') return '伤官泄秀，表达欲强，宜创意发声，须防口舌是非与越界冒进。'
+      return '流干平稳，事业宜按部就班，稳中求进。'
+    }
+    if (focus === 'wealth') {
+      if (['正财', '偏财'].indexOf(tg) >= 0) return '财星临干，财运有进，宜主动开源、经营人脉与生意。'
+      if (tg === '比肩' || tg === '劫财') return '比劫耗财，宜守不宜攻，忌合伙投资、借贷担保。'
+      if (tg === '食神' || tg === '伤官') return '食伤生财，凭才艺技艺生财有道，宜发挥专长变现。'
+      if (tg === '正印' || tg === '偏印') return '印星主稳，宜储蓄积累、稳健理财，忌投机冒进。'
+      return '财运平稳，凭劳动所得，重在积累。'
+    }
+    if (focus === 'love') {
+      if (spouseGods.indexOf(tg) >= 0) return isMale ? '妻星临干，感情易有进展，宜主动用心经营。' : '夫星临干，姻缘与感情易有动向，宜坦诚相待。'
+      if (CHONG[fz] === disk.pillars.day.zhi) return '日支受冲，感情易起波澜，忌意气用事，宜多沟通降温。'
+      if (HE6[fz] === disk.pillars.day.zhi) return '日支逢合，人缘桃花加分，单身者易遇有心人，宜把握分寸。'
+      if (['伤官', '七杀'].indexOf(tg) >= 0) return '此日情绪易躁，感情上忌针尖对麦芒，柔言胜刚语。'
+      return '感情平稳，宜多陪伴、多倾听，细水长流。'
+    }
+    if (focus === 'health') {
+      if (ke(fzEl, de)) return '流支五行克身，精力易耗，宜早睡养神、注意休整。'
+      if (sheng(fzEl, de)) return '流支生身，气血顺畅，宜趁势调理与锻炼。'
+      if (CHONG[fz] === disk.pillars.day.zhi) return '日支相冲，情绪与睡眠易受影响，忌熬夜与剧烈耗损。'
+      if (['七杀', '伤官'].indexOf(tg) >= 0) return '精神压力偏大，宜放松减压，防疲劳积累。'
+      return '整体平稳，起居有常、饮食有节即可。'
+    }
+    return ''
   }
   function bandOf(score) {
     for (const b of SCORE_BAND) if (score >= b.min) return b
@@ -1336,7 +1419,7 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   }
 
   // 每日运势
-  function dailyFortune(disk, date) {
+  function dailyFortune(disk, date, focus) {
     const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate()
     const dayIdx = dayPillarIndex(y, m, d)
     const dayGan = dayIdx % 10, dayZhi = dayIdx % 12
@@ -1344,7 +1427,7 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     const jianchu = JIANCHU[(dayZhi - lm.zhi + 12) % 12]
     const lr = solar2lunar(y, m, d)
     const flow = { gan: dayGan, zhi: dayZhi }
-    const score = fortuneScore(disk, flow, { jianchu })
+    const score = fortuneScore(disk, flow, { jianchu }, focus)
     const band = bandOf(score)
     const yy = yiJiOf(disk, flow, jianchu)
     const tg = shiShen(disk.dayGan, dayGan)
@@ -1354,15 +1437,16 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
       gzText: `${STEMS[dayGan]}${BRANCHES[dayZhi]}日`,
       jianchu: `${jianchu.name}日`,
       chongSha: `冲${ZODIACS[CHONG[dayZhi]]} · 煞${shaFang(dayZhi)}`,
-      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji,
+      focus: focus || 'all', focusText: focusAdvice(disk, flow, focus)
     }
   }
 
   // 每月运势
-  function monthlyFortune(disk, y, m) {
+  function monthlyFortune(disk, y, m, focus) {
     const gz = monthGanZhi(y, m, 15, 12, 0)
     const flow = gz
-    const score = fortuneScore(disk, flow)
+    const score = fortuneScore(disk, flow, null, focus)
     const band = bandOf(score)
     const yy = yiJiOf(disk, flow, null)
     const tg = shiShen(disk.dayGan, gz.gan)
@@ -1370,15 +1454,16 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
       title: `${monthBelongYear(y, m)}年 ${STEMS[gz.gan]}${BRANCHES[gz.zhi]}月`,
       dateText: `${y}年${m}月`,
       gzText: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]} · 流月`,
-      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji,
+      focus: focus || 'all', focusText: focusAdvice(disk, flow, focus)
     }
   }
 
   // 流年
-  function yearlyFortune(disk, y) {
+  function yearlyFortune(disk, y, focus) {
     const gz = yearGanZhi(y)
     const flow = gz
-    const score = fortuneScore(disk, flow)
+    const score = fortuneScore(disk, flow, null, focus)
     const band = bandOf(score)
     const yy = yiJiOf(disk, flow, null)
     const tg = shiShen(disk.dayGan, gz.gan)
@@ -1386,7 +1471,8 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
       title: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]}年`,
       dateText: `${y}年（立春起）`,
       gzText: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]} · 流年`,
-      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji,
+      focus: focus || 'all', focusText: focusAdvice(disk, flow, focus)
     }
   }
 
@@ -1405,7 +1491,7 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   }
   function goHome() { setView('home') }
   function goFortune() {
-    if (!app.fortune) app.fortune = { tab: 'daily', my: new Date().getFullYear(), mm: new Date().getMonth() + 1, yy: new Date().getFullYear() }
+    if (!app.fortune) app.fortune = { tab: 'daily', focus: 'all', my: new Date().getFullYear(), mm: new Date().getMonth() + 1, yy: new Date().getFullYear() }
     setView('fortune')
     renderFortune()
   }
@@ -1589,16 +1675,19 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
         <div class="yi-col yi"><h4>宜</h4><ul>${yi}</ul></div>
         <div class="yi-col ji"><h4>忌</h4><ul>${ji}</ul></div>
       </div>
-      <div class="fortune-advice">${f.band.text}</div>`
+      <div class="fortune-advice">${f.band.text}</div>
+      ${f.focus && f.focus !== 'all' ? `<div class="fortune-advice focus-advice">侧重 · ${FOCUS_LABEL[f.focus]}：${f.focusText}</div>` : ''}`
   }
   function renderFortune() {
     const ft = app.fortune
     if (!app.bazi) return
+    // 侧重选择高亮
+    document.querySelectorAll('#focus-row button').forEach(b => b.classList.toggle('active', b.dataset.focus === ft.focus))
     // 每日
-    const daily = dailyFortune(app.bazi, new Date())
+    const daily = dailyFortune(app.bazi, new Date(), ft.focus)
     $('fortune-daily').innerHTML = fortunePanelHTML(daily)
     // 每月
-    const monthly = monthlyFortune(app.bazi, ft.my, ft.mm)
+    const monthly = monthlyFortune(app.bazi, ft.my, ft.mm, ft.focus)
     $('fortune-monthly').innerHTML = `
       <div class="fnav">
         <button class="fn-btn" id="fn-m-prev">‹ 上月</button>
@@ -1606,7 +1695,7 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
         <button class="fn-btn" id="fn-m-next">下月 ›</button>
       </div>` + fortunePanelHTML(monthly)
     // 流年
-    const yearly = yearlyFortune(app.bazi, ft.yy)
+    const yearly = yearlyFortune(app.bazi, ft.yy, ft.focus)
     const nowY = new Date().getFullYear()
     $('fortune-yearly').innerHTML = `
       <div class="fnav">
@@ -1775,6 +1864,14 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     app.fortune.tab = b.dataset.tab
     document.querySelectorAll('#fortune-tabs button').forEach(x => x.classList.toggle('active', x === b))
     ;['daily', 'monthly', 'yearly'].forEach(t => $(`fortune-${t}`).classList.toggle('active', t === app.fortune.tab))
+  })
+  // 侧重切换
+  $('focus-row').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    app.fortune.focus = b.dataset.focus
+    document.querySelectorAll('#focus-row button').forEach(x => x.classList.toggle('active', x === b))
+    renderFortune()
   })
   document.addEventListener('click', (e) => {
     const id = e.target.id
