@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f5f1e8">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="description" content="闲来一卦 — 随缘起卦，静观天机。灵感源自《易经》六十四卦，仅供文化欣赏与娱乐参考。">
+<meta name="description" content="闲来一卦 — 随缘起卦，观命析运。六爻与生辰八字，灵感源自《易经》与《命运的求索》，仅供文化欣赏与娱乐参考。">
 <title>闲来一卦</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/avatar.png" type="image/png">
@@ -17,6 +17,9 @@
 :root {
   --bg: #f5f1e8; --ink: #2b2b2b; --muted: #8a8578; --accent: #b03a2e;
   --body: #4a463d; --faint: #b8b2a2; --fainter: #c9c3b3; --line: #d8d2c2;
+  --card: #fcf9f2;
+  /* 五行低饱和色 */
+  --el-mu: #7a8f6f; --el-huo: #b03a2e; --el-tu: #a0855f; --el-jin: #9a958a; --el-shui: #5f7a92;
 }
 html, body {
   margin: 0;
@@ -27,18 +30,63 @@ html, body {
 * { box-sizing: border-box; }
 body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
 button { font-family: inherit; background: none; border: none; padding: 0; cursor: pointer; color: inherit; }
+select, input { font-family: inherit; }
 
 /* ============================================================
-   三态容器（原 wxml wx:if / wx:elif / wx:else）
+   视图容器
    ============================================================ */
 .view { display: none; min-height: 100vh; min-height: 100dvh; }
 .view.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#view-result.active { display: block; }
+#view-result.active, #view-bazi-input.active, #view-bazi-result.active, #view-fortune.active { display: block; }
 #view-casting { position: relative; }
+#view-idle.active { justify-content: flex-start; }
 
 /* ============================================================
-   主页态（源自 index.wxss .idle/.coin-*，rpx 已按 750 设计宽换算为 px）
+   顶栏（新增）
    ============================================================ */
+.view-topbar {
+  width: 100%; max-width: 480px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.back-link { font-size: 14px; color: var(--muted); letter-spacing: 2px; padding: 6px 4px; }
+.back-link:active { opacity: 0.5; }
+.topbar-title { font-size: 14px; color: var(--ink); letter-spacing: 6px; text-indent: 6px; }
+
+/* ============================================================
+   首页卡片（新增）
+   ============================================================ */
+.home-inner {
+  align-items: center;
+  padding: max(env(safe-area-inset-top), 64px) 32px 48px;
+}
+.app-title { font-size: 40px; letter-spacing: 12px; text-indent: 12px; margin-bottom: 10px; }
+.app-sub { font-size: 12px; color: var(--muted); letter-spacing: 3px; margin-bottom: 56px; }
+.home-card {
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; max-width: 420px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px; margin-bottom: 18px; text-align: left;
+}
+.home-card:active { background: rgba(43, 43, 43, 0.04); }
+.card-seal {
+  width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent); color: #fff; font-size: 28px;
+  display: flex; align-items: center; justify-content: center;
+}
+.card-seal.seal-bazi { background: var(--ink); }
+.card-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.card-title { font-size: 20px; letter-spacing: 6px; }
+.card-sub { font-size: 12px; color: var(--faint); letter-spacing: 1px; }
+.card-arrow { font-size: 26px; color: var(--fainter); }
+
+/* ============================================================
+   起卦主页态（源自 index.wxss）
+   ============================================================ */
+.idle-center {
+  flex: 1; width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
 .coin-ring {
   width: 110px; height: 110px; border-radius: 50%;
   border: 1.5px solid var(--ink);
@@ -49,7 +97,7 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
 .idle-tip { margin-top: 28px; font-size: 13px; color: var(--muted); letter-spacing: 6px; text-indent: 6px; }
 
 /* ============================================================
-   起卦动画（源自 index.wxss .casting/.ripple/.casting-text）
+   起卦动画
    ============================================================ */
 .ripple {
   position: absolute; width: 110px; height: 110px; border-radius: 50%;
@@ -72,22 +120,21 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
 }
 
 /* ============================================================
-   结果态（源自 index.wxss .result 及以下）
+   结果态（源自 index.wxss）
    ============================================================ */
 .result-inner {
   display: flex; flex-direction: column; align-items: center;
-  padding: 32px 32px 48px; /* 顶部由安全区适配覆盖 */
+  padding: 32px 32px 48px;
   box-sizing: border-box;
 }
 @supports (padding: env(safe-area-inset-top)) {
-  /* 刘海屏 / PWA 全屏下避让状态栏；普通浏览器标签页内为 0，用 max() 兜底 */
   .result-inner { padding-top: max(env(safe-area-inset-top), 32px); }
 }
 .gua-lines { margin-bottom: 36px; }
 .line-row { display: flex; align-items: center; margin-bottom: 14px; }
 .line-row:last-child { margin-bottom: 0; }
 .yao { width: 120px; height: 9px; display: flex; align-items: center; }
-.seg { background: var(--ink); height: 9px; border-radius: 1px; }
+.seg-line { background: var(--ink); height: 9px; border-radius: 1px; }
 .seg-full { width: 120px; }
 .seg-half { width: 54px; }
 .seg-gap { width: 12px; height: 9px; }
@@ -99,9 +146,8 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
 .hint { font-size: 14px; color: var(--accent); letter-spacing: 1px; margin-bottom: 28px; text-align: center; line-height: 1.9; }
 .changed { font-size: 13px; color: var(--muted); letter-spacing: 3px; margin-bottom: 24px; }
 .aura { font-size: 11px; color: var(--faint); letter-spacing: 1.5px; margin-bottom: 16px; text-align: center; }
-.disclaimer { font-size: 10px; color: var(--fainter); letter-spacing: 1px; margin-bottom: 28px; text-align: center; }
+.disclaimer { font-size: 10px; color: var(--fainter); letter-spacing: 1px; margin-bottom: 28px; text-align: center; line-height: 1.7; }
 
-/* 按钮：再占一卦 / 分享 */
 .again {
   font-size: 13px; color: var(--muted); letter-spacing: 4px; text-indent: 4px;
   border: 1px solid var(--line); border-radius: 24px; padding: 10px 28px;
@@ -114,7 +160,121 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
 .share-btn:active { opacity: 0.85; }
 
 /* ============================================================
-   Toast（网页版新增：分享降级提示）
+   八字输入表单（新增）
+   ============================================================ */
+.form-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px; width: 100%; max-width: 420px;
+}
+.field-label { font-size: 12px; color: var(--muted); letter-spacing: 2px; margin: 14px 0 6px; }
+.field-label:first-child { margin-top: 0; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 24px; overflow: hidden; }
+.seg button { flex: 1; padding: 8px 0; font-size: 14px; color: var(--muted); }
+.seg button.active { background: var(--accent); color: #fff; }
+.date-row { display: flex; gap: 8px; }
+.date-row input { flex: 1.2; }
+.date-row select { flex: 1; }
+select, input[type=number] {
+  width: 100%; font-size: 15px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 10px; color: var(--ink); appearance: auto;
+}
+select:focus, input:focus { border-color: var(--accent); outline: none; }
+.form-note { font-size: 11px; color: var(--faint); line-height: 1.7; margin-top: 10px; }
+.clear-link {
+  display: block; margin: 18px auto 0; font-size: 12px; color: var(--fainter);
+  letter-spacing: 2px;
+}
+
+/* ============================================================
+   命盘（新增）
+   ============================================================ */
+.bazi-head { font-size: 12px; color: var(--muted); letter-spacing: 2px; margin-bottom: 16px; }
+.pillars {
+  width: 100%; max-width: 480px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 16px;
+}
+.pillar-col {
+  background: var(--card); border: 1px solid var(--line); border-top: 2px solid var(--line);
+  border-radius: 8px; padding: 10px 4px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.pillar-col.pillar-day { border-top-color: var(--accent); }
+.pillar-label { font-size: 11px; color: var(--muted); letter-spacing: 2px; }
+.pillar-gan, .pillar-zhi { font-size: 32px; line-height: 1.2; }
+.pillar-cang { font-size: 10px; color: var(--faint); line-height: 1.5; text-align: center; }
+.pillar-sub { font-size: 10px; color: var(--fainter); }
+.pillar-note { font-size: 10px; color: var(--accent); line-height: 1.5; text-align: center; margin-top: 6px; }
+
+.analysis-card {
+  width: 100%; max-width: 480px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 14px; box-sizing: border-box;
+}
+.analysis-card h3 {
+  font-size: 12px; color: var(--muted); letter-spacing: 3px;
+  margin: 0 0 10px; font-weight: normal;
+  border-bottom: 1px solid var(--line); padding-bottom: 8px;
+}
+.analysis-card .txt { font-size: 14px; line-height: 2; color: var(--body); letter-spacing: 0.5px; }
+.analysis-card .txt b { color: var(--ink); font-weight: normal; }
+.analysis-card .txt .red { color: var(--accent); }
+
+.wuxing-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.wuxing-row:last-child { margin-bottom: 0; }
+.wuxing-name { width: 20px; font-size: 13px; color: var(--ink); text-align: center; }
+.wuxing-bar-bg { flex: 1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.wuxing-bar { height: 100%; border-radius: 5px; min-width: 2px; }
+.wuxing-count { width: 40px; text-align: right; font-size: 12px; color: var(--muted); }
+
+.xiyong-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.chip { font-size: 13px; letter-spacing: 2px; padding: 4px 14px; border-radius: 16px; }
+.chip.xi { color: #fff; background: var(--el-shui); }
+.chip.ji { color: var(--fainter); border: 1px solid var(--line); }
+
+.dayun-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.dayun-cell {
+  min-width: 92px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 6px; text-align: center; flex-shrink: 0;
+}
+.dayun-cell.current { border-color: var(--accent); }
+.dayun-cell .dy-gz { font-size: 16px; letter-spacing: 2px; color: var(--ink); }
+.dayun-cell .dy-ts { font-size: 10px; color: var(--faint); margin-top: 2px; }
+.dayun-cell .dy-year { font-size: 10px; color: var(--fainter); margin-top: 2px; }
+.dayun-note { font-size: 11px; color: var(--faint); margin-top: 10px; line-height: 1.7; }
+
+/* ============================================================
+   运势（新增）
+   ============================================================ */
+.fortune-tabs { width: 100%; max-width: 480px; margin-bottom: 18px; }
+.fpanel { display: none; width: 100%; max-width: 480px; }
+.fpanel.active { display: block; }
+.fnav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.fnav .fn-btn { font-size: 13px; color: var(--muted); padding: 6px 10px; letter-spacing: 2px; }
+.fnav .fn-btn:active { opacity: 0.5; }
+.fnav .fn-title { font-size: 15px; letter-spacing: 3px; }
+.fortune-head { text-align: center; margin-bottom: 6px; }
+.fortune-gz { font-size: 34px; letter-spacing: 8px; text-indent: 8px; }
+.fortune-date { font-size: 12px; color: var(--faint); margin-top: 8px; letter-spacing: 1px; }
+.fortune-score { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin: 14px 0 18px; }
+.fortune-score .num { font-size: 52px; color: var(--accent); line-height: 1; }
+.fortune-band { font-size: 20px; letter-spacing: 4px; color: var(--ink); }
+.yi-ji { display: flex; gap: 10px; margin-bottom: 10px; }
+.yi-col { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.yi-col h4 { font-size: 12px; margin: 0 0 8px; letter-spacing: 3px; font-weight: normal; }
+.yi-col.yi h4 { color: var(--el-mu); }
+.yi-col.ji h4 { color: var(--accent); }
+.yi-col ul { margin: 0; padding-left: 16px; }
+.yi-col li { font-size: 12px; color: var(--body); line-height: 1.9; }
+.fortune-advice {
+  font-size: 13px; color: var(--body); line-height: 2;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+
+/* ============================================================
+   Toast
    ============================================================ */
 #toast {
   position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%);
@@ -128,12 +288,46 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
 <body>
   <div class="page">
 
-    <!-- 主页态：一枚「卦」字按钮 -->
-    <div id="view-idle" class="view idle active">
-      <div id="btn-cast" class="coin-ring" role="button" aria-label="起卦">
-        <div class="coin-char">卦</div>
+    <!-- 首页：两卡入口 -->
+    <div id="view-home" class="view home active">
+      <div class="result-inner home-inner">
+        <div class="app-title">闲来一卦</div>
+        <div class="app-sub">随缘起卦 · 观命析运</div>
+
+        <button id="btn-card-hexagram" class="home-card">
+          <span class="card-seal">卦</span>
+          <span class="card-body">
+            <span class="card-title">六爻起卦</span>
+            <span class="card-sub">随缘一触，静观天机</span>
+          </span>
+          <span class="card-arrow">›</span>
+        </button>
+
+        <button id="btn-card-bazi" class="home-card">
+          <span class="card-seal seal-bazi">命</span>
+          <span class="card-body">
+            <span class="card-title">生辰八字</span>
+            <span class="card-sub" id="card-bazi-sub">子平四柱 · 观命析运</span>
+          </span>
+          <span class="card-arrow">›</span>
+        </button>
       </div>
-      <div class="idle-tip">随缘一触</div>
+    </div>
+
+    <!-- 起卦主页态 -->
+    <div id="view-idle" class="view idle">
+      <div class="result-inner" style="padding-bottom:0; flex:0 0 auto;">
+        <div class="view-topbar">
+          <button class="back-link" data-go="home">‹ 返回</button>
+          <span class="topbar-title">六爻起卦</span><span></span>
+        </div>
+      </div>
+      <div class="idle-center">
+        <div id="btn-cast" class="coin-ring" role="button" aria-label="起卦">
+          <div class="coin-char">卦</div>
+        </div>
+        <div class="idle-tip">随缘一触</div>
+      </div>
     </div>
 
     <!-- 起卦动画 -->
@@ -143,28 +337,102 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
       <div class="casting-text">凝神</div>
     </div>
 
-    <!-- 结果态 -->
+    <!-- 起卦结果 -->
     <div id="view-result" class="view result">
       <div class="result-inner">
-        <!-- 六爻爻线（自上而下，由 JS 渲染） -->
+        <div class="view-topbar">
+          <button class="back-link" data-go="home">‹ 返回</button>
+          <span class="topbar-title">六爻起卦</span><span></span>
+        </div>
         <div id="gua-lines" class="gua-lines"></div>
-
         <div id="gua-name" class="gua-name"></div>
         <div id="gua-sub" class="gua-sub"></div>
         <div id="guaci" class="guaci"></div>
         <div id="image" class="image"></div>
         <div id="hint" class="hint"></div>
-
-        <!-- 变卦 -->
         <div id="changed" class="changed"></div>
-
-        <!-- 天时地气 -->
         <div id="aura" class="aura"></div>
-
         <div class="disclaimer">灵感源自《易经》六十四卦，仅供文化欣赏与娱乐参考</div>
-
         <button id="btn-again" class="again">再占一卦</button>
         <button id="btn-share" class="share-btn">分享</button>
+      </div>
+    </div>
+
+    <!-- 八字输入 -->
+    <div id="view-bazi-input" class="view bazi-input">
+      <div class="result-inner">
+        <div class="view-topbar">
+          <button class="back-link" data-go="home">‹ 返回</button>
+          <span class="topbar-title">生辰八字</span><span></span>
+        </div>
+        <div class="form-card">
+          <div class="field-label">性别</div>
+          <div class="seg" id="seg-gender">
+            <button data-gender="male" class="active">男</button>
+            <button data-gender="female">女</button>
+          </div>
+          <div class="field-label">历法</div>
+          <div class="seg" id="seg-cal">
+            <button data-cal="solar" class="active">公历</button>
+            <button data-cal="lunar">农历</button>
+          </div>
+          <div class="field-label">出生日期</div>
+          <div class="date-row">
+            <input id="inp-year" type="number" min="1900" max="2100" placeholder="年">
+            <select id="sel-month"></select>
+            <select id="sel-day"></select>
+          </div>
+          <div class="field-label">时辰</div>
+          <select id="sel-shichen"></select>
+          <div class="form-note">晚子时（23:00–24:00）按次日干支计日；时辰越精确，分析越准。出生信息仅保存在本机。</div>
+          <button id="btn-bazi-submit" class="share-btn">排盘看命</button>
+          <button id="btn-bazi-clear" class="clear-link">清除已存信息</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 命盘结果 -->
+    <div id="view-bazi-result" class="view bazi-result">
+      <div class="result-inner">
+        <div class="view-topbar">
+          <button class="back-link" data-go="home">‹ 返回</button>
+          <span class="topbar-title">命盘</span><span></span>
+        </div>
+        <div id="bazi-head" class="bazi-head"></div>
+        <div id="pillars" class="pillars"></div>
+        <div id="wuxing-bars" class="analysis-card"></div>
+        <section class="analysis-card"><h3>日主强弱</h3><div class="txt" id="str-txt"></div></section>
+        <section class="analysis-card"><h3>喜用神</h3><div class="txt" id="xiyong-txt"></div></section>
+        <section class="analysis-card"><h3>格局</h3><div class="txt" id="pattern-txt"></div></section>
+        <section class="analysis-card"><h3>性格</h3><div class="txt" id="person-txt"></div></section>
+        <section class="analysis-card"><h3>事业 · 财运 · 感情</h3><div class="txt" id="sector-txt"></div></section>
+        <section class="analysis-card">
+          <h3>大运</h3>
+          <div id="dayun-grid" class="dayun-grid"></div>
+          <div id="qiyun-txt" class="dayun-note"></div>
+        </section>
+        <div class="disclaimer">命理内容参考陆致极《命运的求索》之子平框架，仅供文化欣赏与娱乐参考，不构成任何决策建议</div>
+        <button id="btn-fortune" class="share-btn">查看运势</button>
+        <button id="btn-rerun" class="again" style="margin-top:12px">重新排盘</button>
+      </div>
+    </div>
+
+    <!-- 运势：每日 / 每月 / 流年 -->
+    <div id="view-fortune" class="view fortune">
+      <div class="result-inner">
+        <div class="view-topbar">
+          <button class="back-link" data-go="bazi-result">‹ 返回</button>
+          <span class="topbar-title">运势</span><span></span>
+        </div>
+        <div class="seg fortune-tabs" id="fortune-tabs">
+          <button data-tab="daily" class="active">每日</button>
+          <button data-tab="monthly">每月</button>
+          <button data-tab="yearly">流年</button>
+        </div>
+        <div id="fortune-daily" class="fpanel active"></div>
+        <div id="fortune-monthly" class="fpanel"></div>
+        <div id="fortune-yearly" class="fpanel"></div>
+        <div class="disclaimer">运势参考《命运的求索》之子平框架推演，仅供文化欣赏与娱乐参考</div>
       </div>
     </div>
 
@@ -176,9 +444,167 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
   'use strict'
 
   /* ====================================================================
-   * ① 八卦 / 六十四卦数据
-   * 来源：小程序 data/trigrams.js、data/hexagrams.js
-   *       —— 改动小程序数据后，需同步更新此处。
+   * 目录（Ctrl+F 跳转）
+   *   ① 数据表（命理）：天干地支 / 五行 / 藏干 / 纳音 / 长生 / 冲合 /
+   *      建除十二神 / 农历编码表 1900-2100
+   *   ② 六爻（原 ①数据 + ②算法）
+   *   ③ 天文历法：JDN / 日柱 / 太阳视黄经(节气) / 公历农历互转 / 年·月·时柱 / 大运
+   *   ④ 排盘引擎：buildBazi / 十神 / 五行 / 强弱 / 喜用神 / 格局 / 大运
+   *   ⑤ 命理文案：buildAnalysis
+   *   ⑥ 运势推算：每日 / 每月 / 流年 / 吉凶评分 / 宜忌
+   *   ⑦ 页面状态与渲染：路由 / 各视图渲染
+   *   ⑧ 交互与事件绑定
+   *   ⑨ 持久化：localStorage
+   *   ⑩ PWA / 调试
+   * ==================================================================== */
+
+  /* ====================================================================
+   * ① 数据表（命理）
+   * ==================================================================== */
+  const STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']
+  const BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+  const ZODIACS = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪']
+  const ELEMENTS = ['木', '火', '土', '金', '水']
+  // 五行索引：木0 火1 土2 金3 水4
+  const STEM_EL = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+  const BRANCH_EL = [4, 2, 0, 0, 2, 1, 1, 2, 3, 3, 2, 4] // 子水丑土寅木卯木辰土巳火午火未土申金酉金戌土亥水
+  const WUXING_COLOR = { '木': 'var(--el-mu)', '火': 'var(--el-huo)', '土': 'var(--el-tu)', '金': 'var(--el-jin)', '水': 'var(--el-shui)' }
+
+  // 藏干：每个地支 [[干序, 权]...]，权 1=本气 0.5=中/余气
+  const HIDDEN = [
+    [[9, 1]],                          // 子：癸
+    [[5, 1], [9, 0.5], [1, 0.5]],      // 丑：己癸辛
+    [[0, 1], [2, 0.5], [4, 0.5]],      // 寅：甲丙戊
+    [[1, 1]],                          // 卯：乙
+    [[4, 1], [1, 0.5], [9, 0.5]],      // 辰：戊乙癸
+    [[2, 1], [6, 0.5], [4, 0.5]],      // 巳：丙庚戊
+    [[3, 1], [5, 0.5]],                // 午：丁己
+    [[5, 1], [3, 0.5], [1, 0.5]],      // 未：己丁乙
+    [[6, 1], [8, 0.5], [4, 0.5]],      // 申：庚壬戊
+    [[7, 1]],                          // 酉：辛
+    [[4, 1], [7, 0.5], [3, 0.5]],      // 戌：戊辛丁
+    [[8, 1], [0, 0.5]]                 // 亥：壬甲
+  ]
+
+  // 长生十二宫（阳干顺行 阴干逆行）
+  const CHANGSHENG_BRANCH = [11, 6, 2, 9, 2, 9, 5, 0, 8, 3] // 甲亥 乙午 丙寅 丁酉 戊寅 己酉 庚巳 辛子 壬申 癸卯
+  const STAGES = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰', '病', '死', '墓', '绝', '胎', '养']
+
+  // 六十甲子纳音（30 对）
+  const NAYIN = ['海中金', '炉中火', '大林木', '路旁土', '剑锋金', '山头火', '涧下水', '城头土', '白蜡金', '杨柳木',
+    '泉中水', '屋上土', '霹雳火', '松柏木', '长流水', '沙中金', '山下火', '平地木', '壁上土', '金箔金',
+    '覆灯火', '天河水', '大驿土', '钗钏金', '桑柘木', '大溪水', '沙中土', '天上火', '石榴木', '大海水']
+
+  // 地支关系：六冲（子午 丑未 寅申 卯酉 辰戌 巳亥）
+  const CHONG = { 0: 6, 6: 0, 1: 7, 7: 1, 2: 8, 8: 2, 3: 9, 9: 3, 4: 10, 10: 4, 5: 11, 11: 5 }
+  // 六合：子丑 寅亥 卯戌 辰酉 巳申 午未
+  const HE6 = { 0: 1, 1: 0, 2: 11, 11: 2, 3: 9, 9: 3, 4: 8, 8: 4, 5: 7, 7: 5, 6: 6, 10: 10 }
+  // 三合局：申子辰(水) 巳酉丑(金) 寅午戌(火) 亥卯未(木)
+  const SANHE_GROUP = {
+    0: [0, 4, 8], 4: [0, 4, 8], 8: [0, 4, 8],
+    3: [3, 7, 11], 7: [3, 7, 11], 11: [3, 7, 11],
+    2: [2, 6, 10], 6: [2, 6, 10], 10: [2, 6, 10],
+    1: [1, 5, 9], 5: [1, 5, 9], 9: [1, 5, 9]
+  }
+
+  // 建除十二神（值日）宜忌
+  const JIANCHU = [
+    { name: '建', yi: ['出行', '上任', '会友', '见工'], ji: ['动土', '开仓'] },
+    { name: '除', yi: ['除服', '疗病', '辟邪', '沐浴'], ji: ['求官', '上任'] },
+    { name: '满', yi: ['祭祀', '纳采', '开市', '立券'], ji: ['栽种', '动土'] },
+    { name: '平', yi: ['修整', '平涂', '扫舍'], ji: ['开渠', '放水'] },
+    { name: '定', yi: ['聚会', '定盟', '纳采', '签约'], ji: ['诉讼', '出行'] },
+    { name: '执', yi: ['祈福', '捕捉', '祭祀'], ji: ['移徙', '嫁娶', '开市'] },
+    { name: '破', yi: ['破屋', '坏垣'], ji: ['远行', '诉讼', '开市'] },
+    { name: '危', yi: ['安床', '祭祀', '祈福'], ji: ['登高', '远行'] },
+    { name: '成', yi: ['交易', '开市', '嫁娶', '移徙'], ji: ['诉讼', '争执'] },
+    { name: '收', yi: ['纳财', '收养', '入仓'], ji: ['开市', '安葬'] },
+    { name: '开', yi: ['开市', '开仓', '出行', '嫁娶'], ji: ['安葬', '词讼'] },
+    { name: '闭', yi: ['筑堤', '修屋', '固封'], ji: ['开市', '出行'] }
+  ]
+
+  // ---- 农历编码表 1900-2100（经典编码：bit0-3 闰月号 / bit4-15 月大小 / bit16 闰月大小） ----
+  const LUNAR_INFO = [
+    0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2, // 1900-1909
+    0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977, // 1910-1919
+    0x04970, 0x0a4b0, 0x0b4b5, 0x06a50, 0x06d40, 0x1ab54, 0x02b60, 0x09570, 0x052f2, 0x04970, // 1920-1929
+    0x06566, 0x0d4a0, 0x0ea50, 0x06e95, 0x05ad0, 0x02b60, 0x186e3, 0x092e0, 0x1c8d7, 0x0c950, // 1930-1939
+    0x0d4a0, 0x1d8a6, 0x0b550, 0x056a0, 0x1a5b4, 0x025d0, 0x092d0, 0x0d2b2, 0x0a950, 0x0b557, // 1940-1949
+    0x06ca0, 0x0b550, 0x15355, 0x04da0, 0x0a5b0, 0x14573, 0x052b0, 0x0a9a8, 0x0e950, 0x06aa0, // 1950-1959
+    0x0aea6, 0x0ab50, 0x04b60, 0x0aae4, 0x0a570, 0x05260, 0x0f263, 0x0d950, 0x05b57, 0x056a0, // 1960-1969
+    0x096d0, 0x04dd5, 0x04ad0, 0x0a4d0, 0x0d4d4, 0x0d250, 0x0d558, 0x0b540, 0x0b6a0, 0x195a6, // 1970-1979
+    0x095b0, 0x049b0, 0x0a974, 0x0a4b0, 0x0b27a, 0x06a50, 0x06d40, 0x0af46, 0x0ab60, 0x09570, // 1980-1989
+    0x04af5, 0x04970, 0x064b0, 0x074a3, 0x0ea50, 0x06b58, 0x05ac0, 0x0ab60, 0x096d5, 0x092e0, // 1990-1999
+    0x0c960, 0x0d954, 0x0d4a0, 0x0da50, 0x07552, 0x056a0, 0x0abb7, 0x025d0, 0x092d0, 0x0cab5, // 2000-2009
+    0x0a950, 0x0b4a0, 0x0baa4, 0x0ad50, 0x055d9, 0x04ba0, 0x0a5b0, 0x15176, 0x052b0, 0x0a930, // 2010-2019
+    0x07954, 0x06aa0, 0x0ad50, 0x05b52, 0x04b60, 0x0a6e6, 0x0a4e0, 0x0d260, 0x0ea65, 0x0d530, // 2020-2029
+    0x05aa0, 0x076a3, 0x096d0, 0x04afb, 0x04ad0, 0x0a4d0, 0x1d0b6, 0x0d250, 0x0d520, 0x0dd45, // 2030-2039
+    0x0b5a0, 0x056d0, 0x055b2, 0x049b0, 0x0a577, 0x0a4b0, 0x0aa50, 0x1b255, 0x06d20, 0x0ada0, // 2040-2049
+    0x14b63, 0x09370, 0x049f8, 0x04970, 0x064b0, 0x168a6, 0x0ea50, 0x06b20, 0x1a6c4, 0x0aae0, // 2050-2059
+    0x092e0, 0x0d2e3, 0x0c960, 0x0d557, 0x0d4a0, 0x0da50, 0x05d55, 0x056a0, 0x0a6d0, 0x055d4, // 2060-2069
+    0x052d0, 0x0a9b8, 0x0a950, 0x0b4a0, 0x0b6a6, 0x0ad50, 0x055a0, 0x0aba4, 0x0a5b0, 0x052b0, // 2070-2079
+    0x0b273, 0x06930, 0x07337, 0x06aa0, 0x0ad50, 0x14b55, 0x04b60, 0x0a570, 0x054e4, 0x0d160, // 2080-2089
+    0x0e968, 0x0d520, 0x0daa0, 0x16aa6, 0x056d0, 0x04ae0, 0x0a9d4, 0x0a4d0, 0x0d150, 0x0f252, // 2090-2099
+    0x0d520 // 2100
+  ]
+  const CN_MONTH = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二']
+  const CN_DAY = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+    '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+    '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十']
+
+  function lunarInfo(y) { return LUNAR_INFO[y - 1900] }
+  function leapMonth(y) { return lunarInfo(y) & 0xf }
+  function leapDays(y) { return (lunarInfo(y) & 0xf) ? ((lunarInfo(y) & 0x10000) ? 30 : 29) : 0 }
+  function monthDays(y, m) { return (lunarInfo(y) & (0x10000 >> m)) ? 30 : 29 }
+  function yearDays(y) {
+    let sum = 348
+    for (let i = 0x8000; i > 0x8; i >>= 1) sum += (lunarInfo(y) & i) ? 1 : 0
+    return sum + leapDays(y)
+  }
+  // 公历(y,m,d) 距 1900-01-01 的天数
+  function solarOffset(y, m, d) {
+    const base = Date.UTC(1900, 0, 1)
+    return Math.round((Date.UTC(y, m - 1, d) - base) / 86400000)
+  }
+  // 公历 → 农历
+  function solar2lunar(y, m, d) {
+    let offset = solarOffset(y, m, d) - solarOffset(1900, 1, 31)
+    let lunarY = 1900
+    while (lunarY < 2101 && offset >= yearDays(lunarY)) { offset -= yearDays(lunarY); lunarY++ }
+    const leap = leapMonth(lunarY)
+    let lm = 1, isLeap = false, leapDone = false, days = 0
+    while (true) {
+      if (leap && lm === leap + 1 && !isLeap) {
+        if (!leapDone) { lm--; isLeap = true; days = leapDays(lunarY) }
+      } else {
+        days = monthDays(lunarY, lm)
+      }
+      if (offset < days) break
+      offset -= days
+      if (isLeap) { isLeap = false; leapDone = true }
+      lm++
+      if (lm > 12) { lunarY++; lm = 1; leapDone = false }
+    }
+    return { year: lunarY, month: lm, isLeap, day: offset + 1 }
+  }
+  // 农历 → 公历
+  function lunar2solar(y, m, d, isLeap) {
+    let offset = 0
+    for (let yy = 1900; yy < y; yy++) offset += yearDays(yy)
+    const leap = leapMonth(y)
+    for (let i = 1; i < m; i++) offset += monthDays(y, i)
+    if (leap && m > leap) offset += leapDays(y)
+    if (isLeap) offset += monthDays(y, m)
+    offset += d - 1
+    const dt = new Date(Date.UTC(1900, 0, 31) + offset * 86400000)
+    return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() }
+  }
+  function lunarStr(r) {
+    return `${r.year}年${r.isLeap ? '闰' : ''}${CN_MONTH[r.month - 1]}月${CN_DAY[r.day - 1]}`
+  }
+
+  /* ====================================================================
+   * ② 六爻（原 data/trigrams.js + data/hexagrams.js + utils/*.js 移植）
    * ==================================================================== */
   const TRIGRAMS = [
     { name: '坤', nature: '地' },
@@ -217,7 +643,7 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     '40': { id: 23, name: '山地剥', short: '剥', pinyin: 'bō', guaci: '不利有攸往。', image: '山附于地，层层剥落。繁华落尽，枝头硕果仅存。', hint: '守住最后那颗果实。' },
     '01': { id: 24, name: '地雷复', short: '复', pinyin: 'fù', guaci: '亨。出入无疾，朋来无咎。反复其道，七日来复。', image: '雷在地中，一阳来复。冬至极处，春信已悄然萌动。', hint: '微光已现，静养待时。' },
     '71': { id: 25, name: '天雷无妄', short: '无妄', pinyin: 'wú wàng', guaci: '元亨利贞。其匪正有眚，不利有攸往。', image: '天下雷行，万物各正性命。不妄为，不妄求，顺天而行。', hint: '莫起妄念，行于正道。' },
-    '47': { id: 26, name: '山天大畜', short: '大畜', pinyin: 'dà xù', guaci: '利贞，不家食吉，利涉大川。', image: '天在山中，至大者藏于至静。蓄德蓄才，厚载而待发。', hint: '大蓄之后，方有大用。' },
+    '47': { id: 26, name: '山天大畜', short: '大畜', pinyin: 'dà chù', guaci: '利贞，不家食吉，利涉大川。', image: '天在山中，至大者藏于至静。蓄德蓄才，厚载而待发。', hint: '大蓄之后，方有大用。' },
     '41': { id: 27, name: '山雷颐', short: '颐', pinyin: 'yí', guaci: '贞吉。观颐，自求口实。', image: '山下有雷，上止下动，如口之咀嚼。观其所养，可知其人。', hint: '慎言语，节饮食，养正气。' },
     '36': { id: 28, name: '泽风大过', short: '大过', pinyin: 'dà guò', guaci: '栋桡，利有攸往，亨。', image: '泽水没木，栋梁负重而将倾。非常之时，承压之极。', hint: '非常之局，当行非常之举。' },
     '22': { id: 29, name: '坎为水', short: '坎', pinyin: 'kǎn', guaci: '习坎，有孚，维心亨，行有尚。', image: '水流而不盈，行险而不失其信。重重险陷，水自向前。', hint: '心有常德，险亦可涉。' },
@@ -258,10 +684,6 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     '52': { id: 64, name: '火水未济', short: '未济', pinyin: 'wèi jì', guaci: '亨，小狐汔济，濡其尾，无攸利。', image: '火在水上，火水不交。小狐渡河，将济而濡尾。事未竟也。', hint: '慎终如始，则未济者终济。' }
   }
 
-  /* ====================================================================
-   * ② 起卦算法（逐字移植自小程序 utils/*.js，保证结果与小程序一致）
-   * ==================================================================== */
-
   // utils/seed.js — FNV-1a 字符串哈希
   function hash(str) {
     let h = 0x811c9dc5
@@ -272,7 +694,7 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     return h >>> 0
   }
 
-  // utils/random.js — mulberry32 种子伪随机数发生器，返回 [0, 1)
+  // utils/random.js — mulberry32
   function mulberry32(a) {
     return function () {
       a |= 0
@@ -283,66 +705,43 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     }
   }
 
-  // utils/cast.js — 六爻起卦
   function trigramIndex(bits) {
-    // bits: [下爻, 中爻, 上爻]，阳 true / 阴 false
     return (bits[0] ? 1 : 0) + (bits[1] ? 2 : 0) + (bits[2] ? 4 : 0)
   }
-
   function lookupHexagram(bits) {
     const lower = trigramIndex(bits.slice(0, 3))
     const upper = trigramIndex(bits.slice(3, 6))
     const hex = HEXAGRAMS[`${upper}${lower}`]
-    return {
-      ...hex,
-      upperNature: TRIGRAMS[upper].nature,
-      lowerNature: TRIGRAMS[lower].nature,
-      upperName: TRIGRAMS[upper].name,
-      lowerName: TRIGRAMS[lower].name
-    }
+    return { ...hex, upperNature: TRIGRAMS[upper].nature, lowerNature: TRIGRAMS[lower].nature, upperName: TRIGRAMS[upper].name, lowerName: TRIGRAMS[lower].name }
   }
-
   function cast(rand) {
-    // 自下而上生成六爻；每爻三掷，2/3 之和为 6/7/8/9
     const lines = []
     for (let i = 0; i < 6; i++) {
       let sum = 0
       for (let j = 0; j < 3; j++) sum += rand() < 0.5 ? 2 : 3
       lines.push(sum)
     }
-
     const isYang = v => v === 7 || v === 9
     const isMoving = v => v === 6 || v === 9
-
     const bits = lines.map(isYang)
     const hexagram = lookupHexagram(bits)
-
     const movingCount = lines.filter(isMoving).length
     let changed = null
     if (movingCount > 0) {
-      const changedBits = lines.map(v => (isMoving(v) ? !isYang(v) : isYang(v)))
-      changed = lookupHexagram(changedBits)
+      changed = lookupHexagram(lines.map(v => (isMoving(v) ? !isYang(v) : isYang(v))))
     }
-
     return {
-      // displayLines 按自上而下排列（上爻在前），供界面直接渲染
-      displayLines: lines
-        .map((v, i) => ({ yang: isYang(v), moving: isMoving(v), pos: i + 1 }))
-        .reverse(),
-      hexagram,
-      changed,
-      movingCount
+      displayLines: lines.map((v, i) => ({ yang: isYang(v), moving: isMoving(v), pos: i + 1 })).reverse(),
+      hexagram, changed, movingCount
     }
   }
 
-  // utils/imagery.js — 天时地气
+  // utils/imagery.js — 天时地气（旧近似节气，仅作氛围，勿与 ③ 精确节气混淆）
   function shichen(date) {
     const h = date.getHours()
-    const names = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
-    return names[Math.floor(((h + 1) % 24) / 2)]
+    return BRANCHES[Math.floor(((h + 1) % 24) / 2)]
   }
-
-  const SOLAR_TERMS = [
+  const SOLAR_TERMS_OLD = [
     [1, 6, '小寒'], [1, 20, '大寒'], [2, 4, '立春'], [2, 19, '雨水'],
     [3, 6, '惊蛰'], [3, 21, '春分'], [4, 5, '清明'], [4, 20, '谷雨'],
     [5, 6, '立夏'], [5, 21, '小满'], [6, 6, '芒种'], [6, 21, '夏至'],
@@ -350,18 +749,15 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     [9, 8, '白露'], [9, 23, '秋分'], [10, 8, '寒露'], [10, 23, '霜降'],
     [11, 8, '立冬'], [11, 22, '小雪'], [12, 7, '大雪'], [12, 22, '冬至']
   ]
-
   function jieqi(date) {
     const m = date.getMonth() + 1
     const d = date.getDate()
-    let result = '冬至' // 1 月 6 日以前归去年冬至
-    for (const [tm, td, name] of SOLAR_TERMS) {
+    let result = '冬至'
+    for (const [tm, td, name] of SOLAR_TERMS_OLD) {
       if (m > tm || (m === tm && d >= td)) result = name
     }
     return result
   }
-
-  // 月相（参考朔：2000-01-06 18:14 UTC，朔望月 29.53059 天）
   function moonPhase(date) {
     const synodic = 29.53059
     const ref = Date.UTC(2000, 0, 6, 18, 14)
@@ -376,7 +772,6 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     if (age < 27.7) return '残月'
     return '晦月'
   }
-
   function latBand(lat) {
     if (lat === null || lat === undefined) return '天涯'
     const a = Math.abs(lat)
@@ -385,7 +780,6 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     if (a >= 23) return '中土'
     return '炎方'
   }
-
   function altBand(alt) {
     if (alt === null || alt === undefined) return '平野'
     if (alt >= 2000) return '云巅'
@@ -394,19 +788,10 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     if (alt >= 0) return '平野'
     return '洼地'
   }
-
-  // loc: { latitude, longitude, altitude }，可为 null
-  function build(date, loc) {
+  function buildAura(date, loc) {
     const lat = loc && typeof loc.latitude === 'number' ? loc.latitude : null
     const alt = loc && typeof loc.altitude === 'number' ? loc.altitude : null
-    const parts = {
-      term: jieqi(date),
-      hour: shichen(date),
-      moon: moonPhase(date),
-      lat: latBand(lat),
-      alt: altBand(alt)
-    }
-    // 无定位时不展示方位与地貌，仅呈现天时
+    const parts = { term: jieqi(date), hour: shichen(date), moon: moonPhase(date), lat: latBand(lat), alt: altBand(alt) }
     const place = lat !== null ? ` · ${parts.lat}${parts.alt}` : ''
     return {
       parts,
@@ -416,21 +801,624 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
   }
 
   /* ====================================================================
-   * ③ 页面状态与渲染（原 setData 逻辑）
+   * ③ 天文历法：JDN / 日柱 / 太阳视黄经(节气) / 四柱 / 大运
    * ==================================================================== */
-  let state = 'idle' // idle | casting | result
-  const app = { displayLines: [], hexagram: null, changed: null, auraText: '' }
+  function norm360(x) { return ((x % 360) + 360) % 360 }
+  function fix10(x) { return ((x % 10) + 10) % 10 }
+  function fix12(x) { return ((x % 12) + 12) % 12 }
 
-  const $ = (id) => document.getElementById(id)
-
-  function setView(next) {
-    state = next
-    ;['idle', 'casting', 'result'].forEach((v) => {
-      $(`view-${v}`).classList.toggle('active', v === next)
-    })
+  // 格里历儒略日（正午 UTC）
+  function julianDay(y, m, d, hour) {
+    if (m <= 2) { y -= 1; m += 12 }
+    const A = Math.floor(y / 100)
+    const B = 2 - A + Math.floor(A / 4)
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5 + (hour || 0) / 24
   }
 
-  // 渲染六爻爻线（对应 wxml wx:for 结构，自上而下）
+  // 日柱序 = (正午儒略日 + 49) mod 60
+  function dayPillarIndex(cy, cm, cd) {
+    return (julianDay(cy, cm, cd, 12) + 49) % 60
+  }
+
+  // 太阳视黄经（度）
+  function sunEclipticLongitude(jd) {
+    const T = (jd - 2451545.0) / 36525
+    const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T
+    const M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T
+    const rad = d => d * Math.PI / 180
+    const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(rad(M))
+      + (0.019993 - 0.000101 * T) * Math.sin(rad(2 * M))
+      + 0.000289 * Math.sin(rad(3 * M))
+    const omega = 125.04 - 1934.136 * T
+    return norm360(L0 + C - 0.00569 - 0.00478 * Math.sin(rad(omega)))
+  }
+
+  const TERM_NAMES = ['小寒', '大寒', '立春', '雨水', '惊蛰', '春分', '清明', '谷雨',
+    '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑',
+    '白露', '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至']
+  const TERM_APPROX = [
+    [1, 5], [1, 20], [2, 4], [2, 19], [3, 5], [3, 20], [4, 5], [4, 20],
+    [5, 5], [5, 21], [6, 5], [6, 21], [7, 7], [7, 22], [8, 7], [8, 23],
+    [9, 7], [9, 23], [10, 8], [10, 23], [11, 7], [11, 22], [12, 7], [12, 22]
+  ]
+  // 节气时刻：黄经 (285+15×n) mod 360 对应节气 n；返回 UTC 毫秒
+  function termTime(year, termIdx) {
+    const target = (285 + 15 * termIdx) % 360
+    const [am, ad] = TERM_APPROX[termIdx]
+    const t0 = julianDay(year, am, ad, 12)
+    let lo = t0 - 22, hi = t0 + 22
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2
+      let diff = sunEclipticLongitude(mid) - target
+      if (diff < -180) diff += 360
+      if (diff > 180) diff -= 360
+      if (diff > 0) hi = mid; else lo = mid
+    }
+    return ((lo + hi) / 2 - 2440587.5) * 86400000
+  }
+  const _termCache = {}
+  function getYearTerms(year) {
+    if (_termCache[year]) return _termCache[year]
+    const arr = []
+    for (let i = 0; i < 24; i++) {
+      const utc = termTime(year, i)
+      arr.push({ idx: i, name: TERM_NAMES[i], utc, bjt: utc + 8 * 3600000 })
+    }
+    _termCache[year] = arr
+    return arr
+  }
+  function msToBjt(ms) {
+    const d = new Date(ms)
+    return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), min: d.getUTCMinutes() }
+  }
+
+  // 六十甲子
+  function ganZhiOfIndex(x) {
+    x = ((x % 60) + 60) % 60
+    return { gan: x % 10, zhi: x % 12, index: x }
+  }
+  function indexOfGanZhi(gan, zhi) {
+    for (let k = 0; k < 10; k++) { const x = zhi + 12 * k; if (x % 10 === gan) return x }
+    return -1
+  }
+  function gzOf(p) { return STEMS[p.gan] + BRANCHES[p.zhi] }
+
+  // 排四柱：输入为北京时（公历 y,m,d,hour,minute,gender）
+  function computePillars(y, m, d, hour, minute, gender) {
+    const isLateZi = hour >= 23
+    const eff = new Date(Date.UTC(y, m - 1, d) + (isLateZi ? 86400000 : 0))
+    const ey = eff.getUTCFullYear(), em = eff.getUTCMonth() + 1, ed = eff.getUTCDate()
+
+    const dayIndex = dayPillarIndex(ey, em, ed)
+    const dayGan = dayIndex % 10
+    const dayZhi = dayIndex % 12
+
+    const hourZhi = Math.floor(((hour + 1) % 24) / 2) % 12
+    const hourGan = (dayGan * 2 + hourZhi) % 10 // 五鼠遁
+
+    const birthMs = Date.UTC(y, m - 1, d, hour, minute || 0)
+    const lichun = getYearTerms(y).find(t => t.name === '立春')
+    const gzYear = birthMs < lichun.bjt ? y - 1 : y
+    const yg = fix10(gzYear - 4), yz = fix12(gzYear - 4)
+
+    // 月柱：以 12 节为界
+    const jieTerms = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+    const terms = getYearTerms(y - 1).concat(getYearTerms(y)).concat(getYearTerms(y + 1))
+      .filter(t => jieTerms.indexOf(t.idx) >= 0)
+      .sort((a, b) => a.bjt - b.bjt)
+    let last = terms[0]
+    for (const t of terms) { if (t.bjt <= birthMs) last = t }
+    const mb = (last.idx / 2 + 1) % 12 // 节→月支
+    const mg = (yg * 2 + 2 + ((mb - 2 + 12) % 12)) % 10 // 五虎遁
+
+    const yang = yg % 2 === 0
+    const male = gender === 'male'
+    const shun = (yang && male) || (!yang && !male)
+
+    return {
+      pillars: {
+        year: { gan: yg, zhi: yz },
+        month: { gan: mg, zhi: mb },
+        day: { gan: dayGan, zhi: dayZhi },
+        hour: { gan: hourGan, zhi: hourZhi }
+      },
+      dayIndex, gzYear, isLateZi, shun, birthMs, lastTerm: last
+    }
+  }
+
+  // 大运：起运 + 八步运
+  function computeDayun(p, num) {
+    const monthIndex = indexOfGanZhi(p.pillars.month.gan, p.pillars.month.zhi)
+    const jieTerms = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+    const by = new Date(p.birthMs).getUTCFullYear()
+    const terms = getYearTerms(by - 1).concat(getYearTerms(by)).concat(getYearTerms(by + 1))
+      .filter(t => jieTerms.indexOf(t.idx) >= 0)
+      .sort((a, b) => a.bjt - b.bjt)
+    let boundary
+    if (p.shun) {
+      boundary = terms.find(t => t.bjt > p.birthMs)
+    } else {
+      let prev = terms[0]
+      for (const t of terms) { if (t.bjt < p.birthMs) prev = t }
+      boundary = prev
+    }
+    const gapDays = Math.abs(boundary.bjt - p.birthMs) / 86400000
+    const totalYears = gapDays / 3
+    const qyYears = Math.floor(totalYears)
+    const qyMonths = Math.floor((gapDays - qyYears * 3) * 4)
+    const list = []
+    let idx = monthIndex
+    const n = num || 8
+    for (let i = 1; i <= n; i++) {
+      idx = p.shun ? (idx + 1) % 60 : (idx + 59) % 60
+      list.push(ganZhiOfIndex(idx))
+    }
+    return { qyYears, qyMonths, list, startYear: by + qyYears, boundary }
+  }
+
+  /* ====================================================================
+   * ④ 排盘引擎
+   * ==================================================================== */
+  // 十神（以日主为准）
+  function shiShen(dayGan, gan) {
+    const de = STEM_EL[dayGan], se = STEM_EL[gan]
+    const samePolarity = (dayGan % 2) === (gan % 2)
+    if (de === se) return samePolarity ? '比肩' : '劫财'
+    if ((de + 1) % 5 === se) return samePolarity ? '食神' : '伤官'
+    if ((se + 1) % 5 === de) return samePolarity ? '偏印' : '正印'
+    if ((de + 2) % 5 === se) return samePolarity ? '偏财' : '正财'
+    return samePolarity ? '七杀' : '正官'
+  }
+  function sheng(a, b) { return (a + 1) % 5 === b }
+  function ke(a, b) { return (a + 2) % 5 === b }
+  function naYin(idx60) { return NAYIN[Math.floor(idx60 / 2)] }
+  function kongWang(dayIndex) {
+    const xun = dayIndex - (dayIndex % 10)
+    return [(xun + 10) % 12, (xun + 11) % 12]
+  }
+  function changSheng(gan, zhi) {
+    const cs = CHANGSHENG_BRANCH[gan]
+    const idx = gan % 2 === 0 ? (zhi - cs + 12) % 12 : (cs - zhi + 12) % 12
+    return STAGES[idx]
+  }
+
+  // 日主强弱
+  function judgeStrength(dayGan, pillars) {
+    const de = STEM_EL[dayGan]
+    let score = 0
+    const mEl = BRANCH_EL[pillars.month.zhi]
+    if (mEl === de) score += 2
+    else if (sheng(mEl, de)) score += 1.5
+    else if (sheng(de, mEl)) score += 1
+    else if (ke(de, mEl)) score += 0.5
+    ;['year', 'month', 'day', 'hour'].forEach(k => {
+      HIDDEN[pillars[k].zhi].forEach(([g, w]) => { if (STEM_EL[g] === de) score += w })
+    })
+    ;['year', 'month', 'hour'].forEach(k => {
+      const ge = STEM_EL[pillars[k].gan]
+      if (ge === de) score += 1
+      else if (sheng(ge, de)) score += 0.5
+    })
+    let level = '中和'
+    if (score >= 4.5) level = '身强'
+    else if (score <= 2.5) level = '身弱'
+    return { score: Math.round(score * 10) / 10, level }
+  }
+
+  // 喜用神
+  function chooseXiyong(level, de, wuxingCount) {
+    const xi = [], ji = []
+    if (level === '身强') {
+      ;[(de + 2) % 5, (de + 3) % 5, (de + 4) % 5].forEach(e => xi.push(ELEMENTS[e]))
+      ;[(de + 1) % 5, de].forEach(e => ji.push(ELEMENTS[e]))
+    } else if (level === '身弱') {
+      ;[(de + 1) % 5, de].forEach(e => xi.push(ELEMENTS[e]))
+      ;[(de + 2) % 5, (de + 3) % 5, (de + 4) % 5].forEach(e => ji.push(ELEMENTS[e]))
+    } else {
+      let min = 0, max = 0
+      ELEMENTS.forEach((n, i) => { if (wuxingCount[n] < wuxingCount[ELEMENTS[min]]) min = i; if (wuxingCount[n] > wuxingCount[ELEMENTS[max]]) max = i })
+      xi.push(ELEMENTS[min])
+      ji.push(ELEMENTS[max])
+    }
+    return { xi: [...new Set(xi)], ji: [...new Set(ji)] }
+  }
+
+  // 格局
+  function judgeGeju(dayGan, pillars) {
+    const mb = pillars.month.zhi
+    const mainGan = HIDDEN[mb][0][0]
+    let tg = shiShen(dayGan, mainGan)
+    let base = '月支本气'
+    if (tg === '比肩' || tg === '劫财') {
+      tg = shiShen(dayGan, pillars.month.gan)
+      base = '月干'
+      if (tg === '比肩' || tg === '劫财') {
+        tg = shiShen(dayGan, pillars.hour.gan)
+        base = '时干'
+      }
+    }
+    const name = (tg === '比肩' ? '建禄格' : tg === '劫财' ? '阳刃格' : tg + '格')
+    return { name, tenGod: tg, base }
+  }
+
+  // 构建命盘
+  function buildBazi(input) {
+    const p = computePillars(input.y, input.m, input.d, input.hour, input.minute, input.gender)
+    const dayGan = p.pillars.day.gan
+    const dayZhi = p.pillars.day.zhi
+    const de = STEM_EL[dayGan]
+    const pillars = p.pillars
+
+    // 五行统计
+    const wuxing = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
+    ;['year', 'month', 'day', 'hour'].forEach(k => {
+      const pil = pillars[k]
+      wuxing[STEM_EL[pil.gan]] += 1
+      wuxing[BRANCH_EL[pil.zhi]] += 1
+      HIDDEN[pil.zhi].forEach(([g, w]) => { wuxing[STEM_EL[g]] += w })
+      wuxing[STEM_EL[pil.gan]] += 0.5
+    })
+    const wuxingCount = {}
+    ELEMENTS.forEach((name, i) => { wuxingCount[name] = Math.round(wuxing[i] * 2) / 2 })
+
+    const pillarInfo = {}
+    ;['year', 'month', 'day', 'hour'].forEach(k => {
+      const pil = pillars[k]
+      const idx = indexOfGanZhi(pil.gan, pil.zhi)
+      pillarInfo[k] = {
+        gan: pil.gan, zhi: pil.zhi,
+        ganTenGod: shiShen(dayGan, pil.gan),
+        cang: HIDDEN[pil.zhi].map(([g, w]) => ({ gan: g, tenGod: shiShen(dayGan, g), weight: w })),
+        nayin: naYin(idx),
+        changSheng: changSheng(dayGan, pil.zhi)
+      }
+    })
+
+    const strength = judgeStrength(dayGan, pillars)
+    const xiyong = chooseXiyong(strength.level, de, wuxingCount)
+    const geju = judgeGeju(dayGan, pillars)
+    const dayun = computeDayun(p, 8)
+
+    return {
+      birth: { y: input.y, m: input.m, d: input.d, hour: input.hour, minute: input.minute, gender: input.gender },
+      pillars, pillarInfo, dayIndex: p.dayIndex, dayGan, dayZhi, gzYear: p.gzYear, shun: p.shun,
+      wuxing: wuxingCount, strength, xiyong, geju, dayun, kongwang: kongWang(p.dayIndex)
+    }
+  }
+
+  /* ====================================================================
+   * ⑤ 命理文案（参考陆致极《命运的求索》之子平框架）
+   * ==================================================================== */
+  const DAYMASTER_PERSONALITY = [
+    '参天大树，正直向上。有担当、求成长，认定目标便一路向上，不喜弯折。贵在自主进取，忌受压压抑。',
+    '藤萝柔韧，能屈能伸。善借势生长，心思细腻，长于协调周旋，柔中带韧。',
+    '太阳之火，光明磊落。热情外放，乐于照亮他人，行动力强，心直口快。',
+    '灯烛之火，含蓄内敛。洞察细微，内心温热而外显温文，重情而敏感，善以柔克刚。',
+    '高岗之土，厚重守信。脚踏实地，言出必行，能扛事、愿承担。',
+    '田园之土，细腻滋养。亲和低调，善默默付出与成就他人，心思细密，耐性极佳。',
+    '刀剑之金，刚毅果断。原则性强，执行力足，遇强则强，宁折不弯。',
+    '珠玉之金，精致讲究。外柔内刚，追求品质与体面，审美好、观察准，自尊心强。',
+    '江海之水，奔涌流动。格局开阔，善谋略、擅变通，不喜被束缚。',
+    '雨露之水，润物无声。直觉敏锐，善体察人心，温和圆融，柔顺而有韧性。'
+  ]
+  const WUXING_TRAIT = {
+    '木': '木主仁，主生发。重仁爱、求进取，喜向上生长，忌停滞压抑。',
+    '火': '火主礼，主炎上。重礼节、尚光明，热情外放，忌躁烈张扬过度。',
+    '土': '土主信，主承载。重诚信、尚稳定，厚重包容，忌固执迟钝。',
+    '金': '金主义，主收敛。重道义、尚秩序，刚毅果决，忌刻板过刚。',
+    '水': '水主智，主流动。重智慧、尚圆融，聪慧变通，忌泛滥多疑。'
+  }
+  const SHISHEN_MEANING = {
+    '正官': '官者管也，主名分、规则与自律。正官健者守正服众，宜公职管理与遵纪守法。',
+    '七杀': '杀者威也，主魄力、竞争与开创。七杀有力者敢闯敢拼，遇压则强，宜开拓与攻坚。',
+    '正印': '印者荫也，主学业、庇护与名望。正印为用者心性仁厚，喜读书进修，多得长辈贵人提携。',
+    '偏印': '枭印偏锋，主灵感、技艺与独见。偏印旺者心思机敏，多才多艺，亦喜独辟蹊径。',
+    '比肩': '同我者也，主自我、手足与平辈。比肩者独立自强，重兄弟朋友之义，宜合伙共进。',
+    '劫财': '与我竞者也，主胆气、慷慨与竞争。劫财旺者热情敢为，善用身边资源，亦须防争财破耗。',
+    '食神': '我生之福，主才艺、享受与福气。食神旺者口福才艺俱佳，温和乐天，宜技艺创作。',
+    '伤官': '我生之泄，主才华、锋芒与创新。伤官旺者聪明外露，不拘一格，忌恃才傲物。',
+    '正财': '我克之正，主俸禄、积蓄与正途之财。正财者勤勉守成，重实干积累，财运稳步。',
+    '偏财': '我克之偏，主大财、人脉与机遇。偏财旺者善抓机会，来财多元，重人情往来。'
+  }
+  const STRENGTH_TEXT = {
+    '身强': '日主得令得地得势，自身力量充盛。为人心志坚定、自主性强，能担大事；宜以官杀约束、以食伤宣泄、以财星取用，忌再遇印比之扶。',
+    '身弱': '日主生扶不足，力量偏弱。为人谦和温顺，善于借力与学习；宜以印星生扶、比劫帮身，忌官杀财星过旺而耗身。',
+    '中和': '日主五行相对平衡，为命局上乘之象。为人通达圆融，能进能退；喜随大运流年的起伏顺势而为。'
+  }
+  const XIYONG_TEXT = {
+    '木': '喜木则宜向东方、取甲乙寅卯之旺气。可多亲近自然、读书养志，于成长与开创中见机。',
+    '火': '喜火则宜向阳、取丙丁巳午之旺气。多行动、多表达，于热情与光照中得助。',
+    '土': '喜土则宜厚德、取戊己辰戌丑未之镇。重信用、守根本，于踏实与积累中成事。',
+    '金': '喜金则宜果断、取庚辛申酉之肃。立规矩、讲原则，于磨砺与精进中得利。',
+    '水': '喜水则宜流动、取壬癸亥子之润。多交流、善变通，于智慧与包容中通达。'
+  }
+  const PATTERN_TEXT = {
+    '正官格': '官星清正，主贵气与自律。命带正官格，行事有度、名分观念重，宜走正统稳健之路，宜公职、管理与文教。',
+    '七杀格': '杀星威猛，主魄力与开创。七杀格者志气高、敢担当，逢制服反成大器，宜竞争性行业与开拓性事业。',
+    '正财格': '财星归正，主勤恳与积累。正财格者务实稳重，理财有方，宜实业、贸易与稳定收入之途。',
+    '偏财格': '财星流动，主人脉与机遇。偏财格者善抓机会、人缘活络，宜经商、投资与资源整合。',
+    '正印格': '印星护身，主学识与庇护。正印格者聪慧仁厚，学业文章见长，多得长辈贵人相助。',
+    '偏印格': '枭印当权，主机敏与偏才。偏印格者思路独特、长于技艺玄学，宜专业精研。',
+    '食神格': '食神吐秀，主才艺与福气。食神格者温和有才，口福人缘俱佳，宜技艺、创作与餐饮养生。',
+    '伤官格': '伤官泄秀，主才华与锋芒。伤官格者聪明外露、不拘一格，宜艺术表达与研发创新，须防口舌是非。',
+    '建禄格': '月令建禄，身旺自主。禄旺之身，坐享自得，宜独立经营、自食其力，忌过贪外助。',
+    '阳刃格': '月令阳刃，性刚气盛。刃旺者敢作敢为，宜武职、竞技与攻坚，须防刚暴争强。'
+  }
+  const SCORE_BAND = [
+    { min: 85, name: '大吉', text: '天地顺遂，所谋皆宜。此段时运高照，宜乘势而上、主动出击，把握关键机会。' },
+    { min: 70, name: '吉', text: '顺风得助，诸事可期。宜稳妥推进、扩大成果，与人合作易有收获。' },
+    { min: 55, name: '中平', text: '平淡中庸，起伏不大。宜守常持稳、静待时机，不宜冒进也不宜消极。' },
+    { min: 40, name: '小凶', text: '阻滞初现，宜敛宜守。宜减少大动作、多作防范，于人际与财务上多留余地。' },
+    { min: 0, name: '凶', text: '时运偏低，防患为先。宜静不宜动，收敛开支、谨慎言行，以守为攻待转运。' }
+  ]
+  const TEN_GOD_ADVICE = {
+    '正官': { yi: '按部就班、遵规守矩', ji: '逾矩越位、锋芒太露' },
+    '七杀': { yi: '攻坚破难、担当重任', ji: '与人硬碰、急躁冲动' },
+    '正印': { yi: '静心学习、沉淀内修', ji: '懈怠懒散、依赖成性' },
+    '偏印': { yi: '独立思考、钻研技艺', ji: '钻牛角尖、多疑寡断' },
+    '比肩': { yi: '自强自立、兄弟相助', ji: '固执己见、独断专行' },
+    '劫财': { yi: '广结善缘、协作共进', ji: '冲动合伙、争强耗财' },
+    '食神': { yi: '发挥才艺、享受生活', ji: '贪图口福、玩物丧志' },
+    '伤官': { yi: '表达创新、展示才华', ji: '口无遮拦、恃才傲物' },
+    '正财': { yi: '踏实习劳、积蓄理财', ji: '守财吝啬、错失时机' },
+    '偏财': { yi: '把握机会、经营人脉', ji: '投机赌博、挥霍无度' }
+  }
+
+  // 命盘分析文案
+  function buildAnalysis(disk) {
+    const dayGan = disk.dayGan
+    const gender = disk.birth.gender
+    const b = disk.birth
+    const shichenName = shichenSlotName(b.hour)
+    const head = `${gender === 'male' ? '男' : '女'} · 公历${b.y}年${b.m}月${b.d}日 · ${shichenName}`
+
+    // 十神计数
+    const tgCount = {}
+    ;['year', 'month', 'day', 'hour'].forEach(k => {
+      const ts = disk.pillarInfo[k].ganTenGod
+      tgCount[ts] = (tgCount[ts] || 0) + 1
+    })
+    disk.pillarInfo.day.cang.forEach(c => { tgCount[c.tenGod] = (tgCount[c.tenGod] || 0) + 0.5 })
+
+    // 性格
+    const de = STEM_EL[dayGan]
+    const personality = `${STEMS[dayGan]}${ELEMENTS[de]}之命，${DAYMASTER_PERSONALITY[dayGan]}\n五行性情：${WUXING_TRAIT[ELEMENTS[de]]}`
+
+    // 事业 / 财运 / 感情
+    const sector = buildSector(disk, tgCount)
+
+    return {
+      head, personality, sector,
+      strengthText: STRENGTH_TEXT[disk.strength.level] + `（强弱评分 ${disk.strength.score}）`,
+      xiyongText: `喜用：${disk.xiyong.xi.join('、')}；忌：${disk.xiyong.ji.join('、')}。\n${disk.xiyong.xi.map(x => XIYONG_TEXT[x]).join('')}`,
+      gejuText: `${disk.geju.name}（取${disk.geju.base}）\n${PATTERN_TEXT[disk.geju.name] || '格局平常，贵在随势而为。'}`,
+      dayunText: `起运 ${disk.dayun.qyYears}岁${disk.dayun.qyMonths ? disk.dayun.qyMonths + '个月' : ''}（${disk.shun ? '顺排' : '逆排'}）。命主约${disk.dayun.startYear}年起行第一步大运，此后每十年一运。`
+    }
+  }
+
+  function buildSector(disk, tgCount) {
+    const de = STEM_EL[disk.dayGan]
+    const parts = []
+
+    // 事业
+    const guanSha = (tgCount['正官'] || 0) + (tgCount['七杀'] || 0)
+    const yin = (tgCount['正印'] || 0) + (tgCount['偏印'] || 0)
+    const shiShang = (tgCount['食神'] || 0) + (tgCount['伤官'] || 0)
+    if (guanSha >= 1.5) parts.push('事业心强，自律而有担当，宜在正职与管理方向着力。')
+    else if (guanSha >= 0.5) parts.push('有基本的规则意识与进取心，事业宜稳中求进。')
+    else parts.push('官星不显，不拘于常规，宜以专业与才艺立身。')
+    if (yin >= 1.5) parts.push('印星有力，学业根基好，多得长辈与贵人提携。')
+    if (shiShang >= 2) parts.push('食伤吐秀，才华外露，宜创作、表达与研发类工作。')
+
+    // 财运
+    const cai = (tgCount['正财'] || 0) + (tgCount['偏财'] || 0)
+    if (cai >= 1.5) parts.push('财星较旺，理财意识强，来财渠道多元，宜务实经营。')
+    else if (cai >= 0.5) parts.push('财星有气，凭本事赚辛苦钱，贵在积累。')
+    else parts.push('财星不显，财运多在专业能力与贵人缘上变现，忌投机。')
+    if (disk.strength.level === '身强') parts.push('身强可任财，能担得住更大的盘子。')
+    else if (disk.strength.level === '身弱') parts.push('身弱财旺则须防见财起意、力不从心，宜先强身而后求财。')
+
+    // 感情
+    const spouse = disk.birth.gender === 'male' ? ['正财', '偏财'] : ['正官', '七杀']
+    const spouseCount = spouse.reduce((s, t) => s + (tgCount[t] || 0), 0)
+    if (spouseCount >= 1.5) parts.push(disk.birth.gender === 'male' ? '妻星明透，感情机会较多，须用心经营而忌拈花惹草。' : '夫星明透，姻缘有其人，贵在识人择偶。')
+    else if (spouseCount >= 0.5) parts.push('配偶星有气，感情平稳，细水长流。')
+    else parts.push('配偶星不显，姻缘来得迟一些，缘分多在三十岁后渐稳。')
+    if (disk.strength.level === '身弱') parts.push('身弱者宜多倾听对方，以柔相处。')
+
+    // 健康（五行偏枯提示）
+    const w = disk.wuxing
+    const maxEl = Object.keys(w).reduce((a, b) => w[a] >= w[b] ? a : b)
+    const minEl = Object.keys(w).reduce((a, b) => w[a] <= w[b] ? a : b)
+    if (w[maxEl] - w[minEl] >= 3) {
+      const body = { '木': '肝胆、筋骨', '火': '心脑血管、眼目', '土': '脾胃、消化', '金': '肺、呼吸道、皮肤', '水': '肾、泌尿' }
+      parts.push(`五行偏枯：${maxEl}气独盛而${minEl}气偏弱，宜留意${body[maxEl]}之养护，起居有常、情志调达。`)
+    }
+    return parts.join('')
+  }
+
+  // 时辰段名（13 档）
+  const SHICHEN_SLOTS = [
+    ['子时(00:00-01:00)', 0], ['丑时(01:00-03:00)', 1], ['寅时(03:00-05:00)', 2], ['卯时(05:00-07:00)', 3],
+    ['辰时(07:00-09:00)', 4], ['巳时(09:00-11:00)', 5], ['午时(11:00-13:00)', 6], ['未时(13:00-15:00)', 7],
+    ['申时(15:00-17:00)', 8], ['酉时(17:00-19:00)', 9], ['戌时(19:00-21:00)', 10], ['亥时(21:00-23:00)', 11],
+    ['晚子时(23:00-24:00)', 12]
+  ]
+  // 由小时 → 时辰段名
+  function shichenSlotName(hour) {
+    if (hour >= 23) return '晚子时'
+    const names = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+    return names[Math.floor(((hour + 1) % 24) / 2)] + '时'
+  }
+
+  /* ====================================================================
+   * ⑥ 运势推算：每日 / 每月 / 流年
+   * ==================================================================== */
+  function yearGanZhi(y) { return { gan: fix10(y - 4), zhi: fix12(y - 4) } }
+  function yearGanZhiName(y) { return STEMS[fix10(y - 4)] + BRANCHES[fix12(y - 4)] }
+
+  // 某公历年月日所属的流月干支
+  function monthGanZhi(y, m, d, hour, minute) {
+    const birthMs = Date.UTC(y, m - 1, d, hour || 12, minute || 0)
+    const lichun = getYearTerms(y).find(t => t.name === '立春')
+    const gzYear = birthMs < lichun.bjt ? y - 1 : y
+    const yg = fix10(gzYear - 4)
+    const jieTerms = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+    const terms = getYearTerms(y - 1).concat(getYearTerms(y)).concat(getYearTerms(y + 1))
+      .filter(t => jieTerms.indexOf(t.idx) >= 0)
+      .sort((a, b) => a.bjt - b.bjt)
+    let last = terms[0]
+    for (const t of terms) { if (t.bjt <= birthMs) last = t }
+    const mb = (last.idx / 2 + 1) % 12
+    const mg = (yg * 2 + 2 + ((mb - 2 + 12) % 12)) % 10
+    return { gan: mg, zhi: mb }
+  }
+  // 某公历年月所属的干支年名
+  function monthBelongYear(y, m) {
+    const ms = Date.UTC(y, m - 1, 15, 12)
+    const lichun = getYearTerms(y).find(t => t.name === '立春')
+    const gy = ms < lichun.bjt ? y - 1 : y
+    return yearGanZhiName(gy)
+  }
+
+  // 三煞方向：申子辰煞南 寅午戌煞北 亥卯未煞西 巳酉丑煞东
+  function shaFang(zhi) {
+    if ([8, 0, 4].indexOf(zhi) >= 0) return '南'
+    if ([2, 6, 10].indexOf(zhi) >= 0) return '北'
+    if ([11, 1, 5].indexOf(zhi) >= 0) return '西'
+    return '东'
+  }
+
+  // 吉凶评分（娱乐级综合）
+  function fortuneScore(disk, flow, extra) {
+    let score = 60
+    const fg = flow.gan, fz = flow.zhi
+    const fEl = STEM_EL[fg]
+    if (disk.xiyong.xi.indexOf(ELEMENTS[fEl]) >= 0) score += 8
+    else if (disk.xiyong.ji.indexOf(ELEMENTS[fEl]) >= 0) score -= 8
+    const zhis = ['year', 'month', 'day', 'hour'].map(k => disk.pillars[k].zhi)
+    zhis.forEach(z => { if (CHONG[fz] === z) score -= 10 })
+    if (zhis.indexOf(HE6[fz]) >= 0) score += 6
+    const grp = SANHE_GROUP[fz]
+    if (grp && grp.some(b => zhis.indexOf(b) >= 0)) score += 6
+    const fzEl = BRANCH_EL[fz]
+    disk.xiyong.xi.forEach(x => {
+      const xe = ELEMENTS.indexOf(x)
+      if (sheng(fzEl, xe)) score += 5
+      if (ke(fzEl, xe)) score -= 5
+    })
+    if (extra && extra.jianchu) {
+      const huang = ['除', '危', '定', '执', '成', '开']
+      score += (huang.indexOf(extra.jianchu.name) >= 0) ? 3 : -3
+    }
+    return Math.max(0, Math.min(100, Math.round(score)))
+  }
+  function bandOf(score) {
+    for (const b of SCORE_BAND) if (score >= b.min) return b
+    return SCORE_BAND[SCORE_BAND.length - 1]
+  }
+  const EL_ADVICE = {
+    '木': { yi: '亲近自然、修心养性', ji: '意气用事、压抑难伸' },
+    '火': { yi: '大胆行动、广结善缘', ji: '急躁上火、言语冲突' },
+    '土': { yi: '稳扎稳打、重视积累', ji: '固执守旧、错失变通' },
+    '金': { yi: '精进技艺、明确原则', ji: '斤斤计较、过于刚硬' },
+    '水': { yi: '多交流、多学习、广纳言', ji: '多疑犹豫、随波逐流' }
+  }
+  function yiJiOf(disk, flow, jianchu) {
+    const yi = jianchu ? [...jianchu.yi] : []
+    const ji = jianchu ? [...jianchu.ji] : []
+    const tg = shiShen(disk.dayGan, flow.gan)
+    const adv = TEN_GOD_ADVICE[tg]
+    if (adv) { yi.push(adv.yi); ji.push(adv.ji) }
+    const ea = EL_ADVICE[ELEMENTS[BRANCH_EL[flow.zhi]]]
+    if (ea) { yi.push(ea.yi); ji.push(ea.ji) }
+    return { yi: [...new Set(yi)].slice(0, 5), ji: [...new Set(ji)].slice(0, 5) }
+  }
+
+  // 每日运势
+  function dailyFortune(disk, date) {
+    const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate()
+    const dayIdx = dayPillarIndex(y, m, d)
+    const dayGan = dayIdx % 10, dayZhi = dayIdx % 12
+    const lm = monthGanZhi(y, m, d, 12, 0)
+    const jianchu = JIANCHU[(dayZhi - lm.zhi + 12) % 12]
+    const lr = solar2lunar(y, m, d)
+    const flow = { gan: dayGan, zhi: dayZhi }
+    const score = fortuneScore(disk, flow, { jianchu })
+    const band = bandOf(score)
+    const yy = yiJiOf(disk, flow, jianchu)
+    const tg = shiShen(disk.dayGan, dayGan)
+    return {
+      title: `${yearGanZhiName(y)}年 ${STEMS[lm.gan]}${BRANCHES[lm.zhi]}月`,
+      dateText: `${y}年${m}月${d}日 · 农历${lunarStr(lr)}`,
+      gzText: `${STEMS[dayGan]}${BRANCHES[dayZhi]}日`,
+      jianchu: `${jianchu.name}日`,
+      chongSha: `冲${ZODIACS[CHONG[dayZhi]]} · 煞${shaFang(dayZhi)}`,
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+    }
+  }
+
+  // 每月运势
+  function monthlyFortune(disk, y, m) {
+    const gz = monthGanZhi(y, m, 15, 12, 0)
+    const flow = gz
+    const score = fortuneScore(disk, flow)
+    const band = bandOf(score)
+    const yy = yiJiOf(disk, flow, null)
+    const tg = shiShen(disk.dayGan, gz.gan)
+    return {
+      title: `${monthBelongYear(y, m)}年 ${STEMS[gz.gan]}${BRANCHES[gz.zhi]}月`,
+      dateText: `${y}年${m}月`,
+      gzText: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]} · 流月`,
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+    }
+  }
+
+  // 流年
+  function yearlyFortune(disk, y) {
+    const gz = yearGanZhi(y)
+    const flow = gz
+    const score = fortuneScore(disk, flow)
+    const band = bandOf(score)
+    const yy = yiJiOf(disk, flow, null)
+    const tg = shiShen(disk.dayGan, gz.gan)
+    return {
+      title: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]}年`,
+      dateText: `${y}年（立春起）`,
+      gzText: `${STEMS[gz.gan]}${BRANCHES[gz.zhi]} · 流年`,
+      tenGod: tg, score, band, yi: yy.yi, ji: yy.ji
+    }
+  }
+
+  /* ====================================================================
+   * ⑦ 页面状态与渲染
+   * ==================================================================== */
+  let view = 'home' // home | idle | casting | result | bazi-input | bazi-result | fortune
+  const app = { displayLines: [], hexagram: null, changed: null, auraText: '', bazi: null, fortune: null }
+  const $ = (id) => document.getElementById(id)
+  const VIEWS = ['home', 'idle', 'casting', 'result', 'bazi-input', 'bazi-result', 'fortune']
+
+  function setView(next) {
+    view = next
+    VIEWS.forEach((v) => $(`view-${v}`).classList.toggle('active', v === next))
+    window.scrollTo(0, 0)
+  }
+  function goHome() { setView('home') }
+  function goFortune() {
+    if (!app.fortune) app.fortune = { tab: 'daily', my: new Date().getFullYear(), mm: new Date().getMonth() + 1, yy: new Date().getFullYear() }
+    setView('fortune')
+    renderFortune()
+  }
+
+  function toast(msg) {
+    const el = $('toast')
+    el.textContent = msg
+    el.classList.add('show')
+    clearTimeout(el._t)
+    el._t = setTimeout(() => el.classList.remove('show'), 1400)
+  }
+
+  // ---- 六爻渲染 ----
   function renderLines(lines) {
     const box = $('gua-lines')
     box.innerHTML = ''
@@ -441,12 +1429,12 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
       yao.className = 'yao'
       if (item.yang) {
         const seg = document.createElement('div')
-        seg.className = 'seg seg-full'
+        seg.className = 'seg-line seg-full'
         yao.appendChild(seg)
       } else {
-        const a = document.createElement('div'); a.className = 'seg seg-half'
+        const a = document.createElement('div'); a.className = 'seg-line seg-half'
         const gap = document.createElement('div'); gap.className = 'seg-gap'
-        const b = document.createElement('div'); b.className = 'seg seg-half'
+        const b = document.createElement('div'); b.className = 'seg-line seg-half'
         yao.appendChild(a); yao.appendChild(gap); yao.appendChild(b)
       }
       row.appendChild(yao)
@@ -458,38 +1446,181 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
       box.appendChild(row)
     })
   }
-
-  function renderResult() {
+  function renderHexagramResult() {
     $('gua-name').textContent = app.hexagram.name
-    $('gua-sub').textContent =
-      `${app.hexagram.pinyin} · 上${app.hexagram.upperNature}下${app.hexagram.lowerNature}（${app.hexagram.upperName}${app.hexagram.lowerName}）`
+    $('gua-sub').textContent = `${app.hexagram.pinyin} · 上${app.hexagram.upperNature}下${app.hexagram.lowerNature}（${app.hexagram.upperName}${app.hexagram.lowerName}）`
     $('guaci').textContent = app.hexagram.guaci
     $('image').textContent = app.hexagram.image
     $('hint').textContent = `—— ${app.hexagram.hint}`
     const changed = $('changed')
-    if (app.changed) {
-      changed.textContent = `之 ${app.changed.name}`
-      changed.style.display = ''
-    } else {
-      changed.style.display = 'none'
-    }
+    if (app.changed) { changed.textContent = `之 ${app.changed.name}`; changed.style.display = '' }
+    else { changed.style.display = 'none' }
     $('aura').textContent = app.auraText
   }
 
-  function toast(msg) {
-    const el = $('toast')
-    el.textContent = msg
-    el.classList.add('show')
-    clearTimeout(el._t)
-    el._t = setTimeout(() => el.classList.remove('show'), 1400)
+  // ---- 八字输入表单 ----
+  const formState = { gender: 'male', cal: 'solar', year: new Date().getFullYear(), month: 0, day: 1, shichen: 6 }
+
+  function fillShichenSelect() {
+    const sel = $('sel-shichen')
+    sel.innerHTML = SHICHEN_SLOTS.map(([label], i) => `<option value="${i}">${label}</option>`).join('')
+    sel.value = String(formState.shichen)
+  }
+  function fillMonthDay() {
+    const y = formState.year
+    const sm = $('sel-month')
+    const months = monthOptions(y)
+    sm.innerHTML = months.map((mm, i) => `<option value="${i}" data-leap="${mm.leap ? 1 : 0}">${monthLabel(mm)}</option>`).join('')
+    if (formState.month >= months.length) formState.month = months.length - 1
+    sm.value = String(formState.month)
+    fillDays()
+  }
+  function monthLabel(mm) {
+    if (formState.cal === 'lunar') return (mm.leap ? '闰' : '') + CN_MONTH[mm.m - 1] + '月'
+    return mm.m + '月'
+  }
+  function fillDays() {
+    const y = formState.year
+    const sm = $('sel-month')
+    const months = monthOptions(y)
+    const cur = months[sm.selectedIndex]
+    const max = cur.leap ? leapDays(y) : monthDays(y, cur.m)
+    const sd = $('sel-day')
+    sd.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}日</option>`).join('')
+    if (formState.day > max) formState.day = max
+    sd.value = String(formState.day)
+  }
+  // 当前历法下的月份选项（农历含闰月）
+  function monthOptions(y) {
+    if (formState.cal === 'lunar') {
+      const months = []
+      for (let i = 1; i <= 12; i++) months.push({ m: i, leap: false })
+      const lm = leapMonth(y)
+      if (lm) months.splice(lm, 0, { m: lm, leap: true })
+      return months
+    }
+    return Array.from({ length: 12 }, (_, i) => ({ m: i + 1, leap: false }))
+  }
+
+  function fillBaziForm(saved) {
+    if (saved) {
+      formState.gender = saved.gender
+      formState.cal = saved.cal
+      formState.year = saved.year
+      formState.month = saved.month
+      formState.day = saved.day
+      formState.shichen = saved.shichen
+    }
+    // 性别/历法 seg 高亮
+    document.querySelectorAll('#seg-gender button').forEach(b => b.classList.toggle('active', b.dataset.gender === formState.gender))
+    document.querySelectorAll('#seg-cal button').forEach(b => b.classList.toggle('active', b.dataset.cal === formState.cal))
+    $('inp-year').value = String(formState.year)
+    fillShichenSelect()
+    fillMonthDay()
+  }
+
+  // ---- 命盘渲染 ----
+  function renderBaziResult(disk, analysis) {
+    $('bazi-head').textContent = analysis.head
+    const kw = disk.kongwang.map(i => BRANCHES[i]).join('')
+    const labels = ['年柱', '月柱', '日柱', '时柱']
+    const keys = ['year', 'month', 'day', 'hour']
+    $('pillars').innerHTML = keys.map((k, i) => {
+      const pi = disk.pillarInfo[k]
+      const cang = pi.cang.map(c => `${STEMS[c.gan]}${c.tenGod === '比肩' ? '比' : c.tenGod === '劫财' ? '劫' : c.tenGod}`).join(' ')
+      const extra = (k === 'day') ? `<div class="pillar-note">旬空 ${kw}</div>` : ''
+      return `<div class="pillar-col${k === 'day' ? ' pillar-day' : ''}">
+        <div class="pillar-label">${labels[i]}</div>
+        <div class="pillar-gan" style="color:${WUXING_COLOR[ELEMENTS[STEM_EL[pi.gan]]]}">${STEMS[pi.gan]}</div>
+        <div class="pillar-zhi" style="color:${WUXING_COLOR[ELEMENTS[BRANCH_EL[pi.zhi]]]}">${BRANCHES[pi.zhi]}</div>
+        <div class="pillar-cang">${cang}</div>
+        <div class="pillar-sub">${pi.nayin}</div>
+        <div class="pillar-sub">${pi.changSheng}</div>
+        ${extra}
+      </div>`
+    }).join('')
+
+    // 五行条
+    const maxW = Math.max(...ELEMENTS.map(e => disk.wuxing[e]))
+    $('wuxing-bars').innerHTML = '<h3>五行</h3>' + ELEMENTS.map(e => `
+      <div class="wuxing-row">
+        <span class="wuxing-name">${e}</span>
+        <div class="wuxing-bar-bg"><div class="wuxing-bar" style="width:${disk.wuxing[e] / maxW * 100}%;background:${WUXING_COLOR[e]}"></div></div>
+        <span class="wuxing-count">${disk.wuxing[e]}</span>
+      </div>`).join('')
+
+    $('str-txt').textContent = analysis.strengthText
+    $('xiyong-txt').innerHTML = `<div class="xiyong-chips">${disk.xiyong.xi.map(x => `<span class="chip xi">喜 ${x}</span>`).join('')}${disk.xiyong.ji.map(x => `<span class="chip ji">忌 ${x}</span>`).join('')}</div>` + analysis.xiyongText
+    $('pattern-txt').textContent = analysis.gejuText
+    $('person-txt').innerHTML = analysis.personality.replace(/\n/g, '<br>')
+    $('sector-txt').textContent = analysis.sector
+
+    // 大运
+    const now = new Date().getFullYear()
+    const curAge = now - disk.birth.y
+    const curIdx = curAge >= disk.dayun.qyYears ? Math.floor((curAge - disk.dayun.qyYears) / 10) : -1
+    $('dayun-grid').innerHTML = disk.dayun.list.map((g, i) => {
+      const start = disk.dayun.startYear + i * 10
+      const end = start + 9
+      const ts = disk.pillarInfo && shiShen(disk.dayGan, g.gan)
+      return `<div class="dayun-cell${i === curIdx ? ' current' : ''}">
+        <div class="dy-gz">${STEMS[g.gan]}${BRANCHES[g.zhi]}</div>
+        <div class="dy-ts">${ts}</div>
+        <div class="dy-year">${start}-${end}</div>
+      </div>`
+    }).join('')
+    $('qiyun-txt').textContent = analysis.dayunText
+  }
+
+  // ---- 运势渲染 ----
+  function fortunePanelHTML(f) {
+    const yi = f.yi.map(x => `<li>宜 · ${x}</li>`).join('')
+    const ji = f.ji.map(x => `<li>忌 · ${x}</li>`).join('')
+    return `
+      <div class="fortune-head">
+        <div class="fortune-gz">${f.gzText}</div>
+        <div class="fortune-date">${f.dateText} · ${f.title}</div>
+      </div>
+      <div class="fortune-score">
+        <span class="num">${f.score}</span>
+        <span class="fortune-band">${f.band.name}</span>
+      </div>
+      <div class="yi-ji">
+        <div class="yi-col yi"><h4>宜</h4><ul>${yi}</ul></div>
+        <div class="yi-col ji"><h4>忌</h4><ul>${ji}</ul></div>
+      </div>
+      <div class="fortune-advice">${f.band.text}</div>`
+  }
+  function renderFortune() {
+    const ft = app.fortune
+    if (!app.bazi) return
+    // 每日
+    const daily = dailyFortune(app.bazi, new Date())
+    $('fortune-daily').innerHTML = fortunePanelHTML(daily)
+    // 每月
+    const monthly = monthlyFortune(app.bazi, ft.my, ft.mm)
+    $('fortune-monthly').innerHTML = `
+      <div class="fnav">
+        <button class="fn-btn" id="fn-m-prev">‹ 上月</button>
+        <span class="fn-title">${monthly.title}</span>
+        <button class="fn-btn" id="fn-m-next">下月 ›</button>
+      </div>` + fortunePanelHTML(monthly)
+    // 流年
+    const yearly = yearlyFortune(app.bazi, ft.yy)
+    const nowY = new Date().getFullYear()
+    $('fortune-yearly').innerHTML = `
+      <div class="fnav">
+        <button class="fn-btn" id="fn-y-prev">‹ 前一年</button>
+        <span class="fn-title">${yearly.title}（${ft.yy}）</span>
+        <button class="fn-btn" id="fn-y-next">后一年 ›</button>
+      </div>
+      <div style="text-align:center;margin-bottom:12px"><button class="fn-btn" id="fn-y-now" style="font-size:12px">回到今年</button></div>` + fortunePanelHTML(yearly)
   }
 
   /* ====================================================================
-   * ④ 交互（对应原 bindtap 事件）
+   * ⑧ 交互与事件绑定
    * ==================================================================== */
-
-  // 真随机熵：Web Crypto API（所有现代浏览器可用，file:// 与 https 均有效）
-  // 取 2 个 32 位真随机数转 base36 拼串；无 crypto 时降级 Math.random（仍叠加毫秒时间戳）
+  // 真随机熵（网页版增强）
   function randomEntropyStr() {
     try {
       if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
@@ -497,60 +1628,41 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
         window.crypto.getRandomValues(buf)
         return buf[0].toString(36) + buf[1].toString(36)
       }
-    } catch (e) { /* 忽略，走降级 */ }
+    } catch (e) { /* 忽略 */ }
     return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
   }
 
   async function onCast() {
-    if (state === 'casting') return
+    if (view === 'casting') return
     setView('casting')
-
-    // 种子 = 时刻 + 天时地气 + 真随机熵（网页版增强，结果不可复现）：
-    // [t, null, null, null, aura.code, 熵].join('|') = t + "||||" + code + "|" + 熵
     const now = new Date()
     const loc = null
-    const aura = build(now, loc)
-    const seedStr = [
-      now.getTime(),
-      loc && loc.latitude,
-      loc && loc.longitude,
-      loc && loc.altitude,
-      aura.code,
-      randomEntropyStr()
-    ].join('|')
+    const aura = buildAura(now, loc)
+    const seedStr = [now.getTime(), loc && loc.latitude, loc && loc.longitude, loc && loc.altitude, aura.code, randomEntropyStr()].join('|')
     const rand = mulberry32(hash(seedStr))
     const result = cast(rand)
-
-    // 起卦动画片刻后展示结果（与小程序一致：1200ms）
     await new Promise((r) => setTimeout(r, 1200))
     app.displayLines = result.displayLines
     app.hexagram = result.hexagram
     app.changed = result.changed
     app.auraText = aura.text
     renderLines(app.displayLines)
-    renderResult()
+    renderHexagramResult()
     setView('result')
-    window.scrollTo(0, 0)
   }
+  function onAgain() { setView('idle') }
 
-  function onAgain() {
-    setView('idle')
-    window.scrollTo(0, 0)
-  }
-
-  // 分享：Web Share API → 剪贴板 → execCommand，三级降级
   async function onShare() {
-    const title = (state === 'result' && app.hexagram)
+    const title = (view === 'result' && app.hexagram)
       ? `我卜得「${app.hexagram.name}」${app.changed ? '，动爻已现' : ''}，来闲来一卦看看你的运势`
-      : '闲来一卦 — 随缘起卦，静观天机'
-    const text = (state === 'result' && app.hexagram)
+      : '闲来一卦 — 随缘起卦，观命析运'
+    const text = (view === 'result' && app.hexagram)
       ? `我卜得「${app.hexagram.name}」${app.changed ? `，之卦${app.changed.name}` : ''}。${app.hexagram.hint}`
       : title
-
     if (navigator.share) {
-      try { await navigator.share({ title, text }); return } catch (e) { /* 用户取消或失败，继续降级 */ }
+      try { await navigator.share({ title, text }); return } catch (e) { /* 降级 */ }
     }
-    try { await navigator.clipboard.writeText(text); toast('分享文案已复制'); return } catch (e) { /* 继续降级 */ }
+    try { await navigator.clipboard.writeText(text); toast('分享文案已复制'); return } catch (e) { /* 降级 */ }
     const ta = document.createElement('textarea')
     ta.value = text
     ta.setAttribute('readonly', '')
@@ -563,13 +1675,143 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     ta.remove()
   }
 
+  // 提交排盘
+  function onSubmitBazi() {
+    const gender = formState.gender
+    const isLunar = formState.cal === 'lunar'
+    const y = parseInt($('inp-year').value, 10) || formState.year
+    if (y < 1900 || y > 2100) { toast('年份需在 1900–2100 之间'); return }
+    const sm = $('sel-month')
+    const opt = sm.options[sm.selectedIndex]
+    const leap = opt && opt.dataset.leap === '1'
+    const mIdx = sm.selectedIndex + 1
+    const d = parseInt($('sel-day').value, 10) || 1
+    const shiIdx = parseInt($('sel-shichen').value, 10) || 0
+    // 时辰段 → 代表时刻
+    let hour = shiIdx * 2, minute = 30
+    if (shiIdx === 12) { hour = 23; minute = 30 }
+
+    let sy = y, smm, sdd
+    if (isLunar) {
+      const cur = monthOptions(y)[sm.selectedIndex]
+      if (!cur) { toast('农历月份数据异常'); return }
+      const s = lunar2solar(y, cur.m, d, cur.leap)
+      sy = s.y; smm = s.m; sdd = s.d
+    } else {
+      smm = mIdx; sdd = d
+    }
+
+    try {
+      const disk = buildBazi({ y: sy, m: smm, d: sdd, hour, minute, gender })
+      const analysis = buildAnalysis(disk)
+      app.bazi = disk
+      formState.year = y; formState.month = sm.selectedIndex; formState.day = d
+      saveBazi({ gender, cal: isLunar ? 'lunar' : 'solar', year: y, month: sm.selectedIndex, day: d, shichen: shiIdx, disk })
+      renderBaziResult(disk, analysis)
+      setView('bazi-result')
+    } catch (e) {
+      console.error(e)
+      toast('排盘失败，请检查输入')
+    }
+  }
+
+  function onClearBazi() {
+    clearBazi()
+    updateHomeCard()
+    toast('已清除')
+  }
+
+  // 事件绑定
+  $('btn-card-hexagram').addEventListener('click', () => setView('idle'))
+  $('btn-card-bazi').addEventListener('click', () => {
+    if (app.bazi) { renderBaziResult(app.bazi, buildAnalysis(app.bazi)); setView('bazi-result') }
+    else { fillBaziForm(); setView('bazi-input') }
+  })
+  document.querySelectorAll('.back-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const go = btn.dataset.go
+      if (go === 'bazi-result') setView('bazi-result')
+      else goHome()
+    })
+  })
   $('btn-cast').addEventListener('click', onCast)
   $('btn-again').addEventListener('click', onAgain)
   $('btn-share').addEventListener('click', onShare)
+  $('btn-bazi-submit').addEventListener('click', onSubmitBazi)
+  $('btn-bazi-clear').addEventListener('click', onClearBazi)
+  $('btn-fortune').addEventListener('click', goFortune)
+  $('btn-rerun').addEventListener('click', () => { fillBaziForm(); setView('bazi-input') })
+
+  // 性别/历法 seg
+  $('seg-gender').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    formState.gender = b.dataset.gender
+    document.querySelectorAll('#seg-gender button').forEach(x => x.classList.toggle('active', x === b))
+  })
+  $('seg-cal').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    formState.cal = b.dataset.cal
+    document.querySelectorAll('#seg-cal button').forEach(x => x.classList.toggle('active', x === b))
+    fillMonthDay()
+  })
+  $('inp-year').addEventListener('change', () => {
+    let v = parseInt($('inp-year').value, 10)
+    if (isNaN(v)) v = new Date().getFullYear()
+    v = Math.max(1900, Math.min(2100, v))
+    $('inp-year').value = String(v)
+    formState.year = v
+    fillMonthDay()
+  })
+  $('sel-month').addEventListener('change', fillDays)
+  $('sel-day').addEventListener('change', () => { formState.day = parseInt($('sel-day').value, 10) })
+  $('sel-shichen').addEventListener('change', () => { formState.shichen = parseInt($('sel-shichen').value, 10) })
+
+  // 运势 Tab 与翻页
+  $('fortune-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    app.fortune.tab = b.dataset.tab
+    document.querySelectorAll('#fortune-tabs button').forEach(x => x.classList.toggle('active', x === b))
+    ;['daily', 'monthly', 'yearly'].forEach(t => $(`fortune-${t}`).classList.toggle('active', t === app.fortune.tab))
+  })
+  document.addEventListener('click', (e) => {
+    const id = e.target.id
+    if (!id || !app.bazi) return
+    if (id === 'fn-m-prev') { app.fortune.mm--; if (app.fortune.mm < 1) { app.fortune.mm = 12; app.fortune.my-- } renderFortune() }
+    else if (id === 'fn-m-next') { app.fortune.mm++; if (app.fortune.mm > 12) { app.fortune.mm = 1; app.fortune.my++ } renderFortune() }
+    else if (id === 'fn-y-prev') { app.fortune.yy--; renderFortune() }
+    else if (id === 'fn-y-next') { app.fortune.yy++; renderFortune() }
+    else if (id === 'fn-y-now') { app.fortune.yy = new Date().getFullYear(); renderFortune() }
+  })
 
   /* ====================================================================
-   * ⑤ PWA：仅在 http(s) 托管环境下注册 Service Worker
-   *    file:// 直接打开时自动跳过（Chrome 禁止 file:// 注册 SW）
+   * ⑨ 持久化
+   * ==================================================================== */
+  const STORE_KEY = 'xl_yg_bazi'
+  function loadBazi() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY)
+      if (!raw) return null
+      const data = JSON.parse(raw)
+      if (data && data.v === 1 && data.disk) { app.bazi = data.disk; return data }
+    } catch (e) { /* 忽略 */ }
+    return null
+  }
+  function saveBazi(input) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ v: 1, ...input, savedAt: Date.now() })) } catch (e) { /* 隐私模式忽略 */ }
+  }
+  function clearBazi() {
+    app.bazi = null
+    try { localStorage.removeItem(STORE_KEY) } catch (e) { /* 忽略 */ }
+  }
+  function updateHomeCard() {
+    $('card-bazi-sub').textContent = app.bazi ? '查看我的命盘' : '子平四柱 · 观命析运'
+  }
+
+  /* ====================================================================
+   * ⑩ PWA / 初始化 / 调试
    * ==================================================================== */
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
     window.addEventListener('load', () => {
@@ -577,8 +1819,14 @@ button { font-family: inherit; background: none; border: none; padding: 0; curso
     })
   }
 
-  // 调试用：与小程序端到端结果一致性校验入口（发布时可删除）
-  window.__debug = { hash, mulberry32, cast, build, trigramIndex, lookupHexagram }
+  // 初始化：恢复已存命盘，预填表单
+  const saved = loadBazi()
+  updateHomeCard()
+  fillShichenSelect()
+  fillMonthDay()
+
+  window.__debug = { hash, mulberry32, cast, buildAura, computePillars, buildBazi, buildAnalysis, dayPillarIndex, getYearTerms, solar2lunar, lunar2solar, shiShen }
+
 })()
 </script>
 </body>
