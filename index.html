@@ -37,7 +37,8 @@ select, input { font-family: inherit; }
    ============================================================ */
 .view { display: none; min-height: 100vh; min-height: 100dvh; }
 .view.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#view-result.active, #view-bazi-input.active, #view-bazi-result.active, #view-fortune.active { display: block; }
+#view-result.active, #view-bazi-input.active, #view-bazi-result.active, #view-fortune.active,
+#view-hepan-input.active, #view-hepan-result.active { display: block; }
 #view-casting { position: relative; }
 #view-idle.active { justify-content: flex-start; }
 
@@ -286,6 +287,44 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
 }
 
 /* ============================================================
+   双人合盘（新增）
+   ============================================================ */
+.card-seal.seal-hepan { background: var(--el-tu); }
+.hepan-person { margin-bottom: 14px; }
+.hepan-person .person-title { font-size: 13px; color: var(--accent); letter-spacing: 3px; margin-bottom: 4px; }
+.hepan-person .person-title span { color: var(--faint); font-size: 11px; letter-spacing: 1px; }
+.hepan-vs { text-align: center; font-size: 12px; color: var(--fainter); letter-spacing: 6px; margin: 0 0 14px; }
+
+.hp-score-card { text-align: center; margin-bottom: 18px; }
+.hp-score { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin: 6px 0 8px; }
+.hp-score .num { font-size: 64px; color: var(--accent); line-height: 1; }
+.hp-band { font-size: 20px; letter-spacing: 4px; color: var(--ink); }
+.hp-relation { font-size: 12px; color: var(--muted); letter-spacing: 3px; }
+.hp-date { font-size: 11px; color: var(--faint); margin-top: 8px; letter-spacing: 1px; }
+
+.hp-pillars {
+  width: 100%; max-width: 480px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  overflow: hidden; margin-bottom: 14px;
+}
+.hp-row { display: grid; grid-template-columns: 40px repeat(4, 1fr); align-items: center; }
+.hp-row + .hp-row { border-top: 1px solid var(--line); }
+.hp-name { text-align: center; font-size: 13px; color: var(--muted); }
+.hp-cell { text-align: center; padding: 6px 2px; font-size: 15px; letter-spacing: 1px; }
+.hp-cell span { margin: 0 1px; }
+.hp-cell small { display: block; font-size: 10px; color: var(--faint); letter-spacing: 1px; }
+
+.hp-item { display: flex; align-items: flex-start; gap: 8px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px; line-height: 1.7; }
+.hp-item:last-child { border-bottom: none; }
+.hp-item-tag { flex: 0 0 26px; text-align: center; font-size: 11px; border-radius: 10px; padding: 2px 0; }
+.hp-item-tag.吉 { color: #fff; background: var(--el-mu); }
+.hp-item-tag.凶 { color: #fff; background: var(--accent); }
+.hp-item-tag.平 { color: var(--faint); border: 1px solid var(--line); }
+.hp-item-label { flex: 0 0 62px; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+.hp-item-text { flex: 1; color: var(--body); }
+.hp-item-points { flex: 0 0 36px; text-align: right; font-size: 14px; color: var(--accent); }
+
+/* ============================================================
    Toast
    ============================================================ */
 #toast {
@@ -320,6 +359,15 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
           <span class="card-body">
             <span class="card-title">生辰八字</span>
             <span class="card-sub" id="card-bazi-sub">子平四柱 · 观命析运</span>
+          </span>
+          <span class="card-arrow">›</span>
+        </button>
+
+        <button id="btn-card-hepan" class="home-card">
+          <span class="card-seal seal-hepan">合</span>
+          <span class="card-body">
+            <span class="card-title">双人合盘</span>
+            <span class="card-sub" id="card-hepan-sub">姻缘合作 · 观合知处</span>
           </span>
           <span class="card-arrow">›</span>
         </button>
@@ -455,6 +503,96 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
       </div>
     </div>
 
+    <!-- 合盘输入 -->
+    <div id="view-hepan-input" class="view hepan-input">
+      <div class="result-inner">
+        <div class="view-topbar">
+          <button class="back-link" data-go="home">‹ 返回</button>
+          <span class="topbar-title">双人合盘</span><span></span>
+        </div>
+        <div class="form-card" style="margin-bottom:14px">
+          <div class="field-label">关系类型</div>
+          <div class="seg" id="seg-relation">
+            <button data-relation="love" class="active">情侣</button>
+            <button data-relation="work">事业伙伴</button>
+            <button data-relation="hierarchy">上下级</button>
+            <button data-relation="all">综合</button>
+          </div>
+          <div class="form-note">合盘按所选关系侧重：情侣重缘分冲合，伙伴与上下级重五行互补与相生。</div>
+        </div>
+
+        <div class="form-card hepan-person">
+          <div class="person-title">甲 · <span>第一位</span></div>
+          <div class="field-label">性别</div>
+          <div class="seg" id="p1-gender">
+            <button data-gender="male" class="active">男</button>
+            <button data-gender="female">女</button>
+          </div>
+          <div class="field-label">历法</div>
+          <div class="seg" id="p1-cal">
+            <button data-cal="solar" class="active">公历</button>
+            <button data-cal="lunar">农历</button>
+          </div>
+          <div class="field-label">出生日期</div>
+          <div class="date-row">
+            <input id="p1-year" type="number" min="1900" max="2100" placeholder="年">
+            <select id="p1-month"></select>
+            <select id="p1-day"></select>
+          </div>
+          <div class="field-label">时辰</div>
+          <select id="p1-shichen"></select>
+        </div>
+
+        <div class="hepan-vs">— 合 —</div>
+
+        <div class="form-card hepan-person">
+          <div class="person-title">乙 · <span>第二位</span></div>
+          <div class="field-label">性别</div>
+          <div class="seg" id="p2-gender">
+            <button data-gender="male" class="active">男</button>
+            <button data-gender="female">女</button>
+          </div>
+          <div class="field-label">历法</div>
+          <div class="seg" id="p2-cal">
+            <button data-cal="solar" class="active">公历</button>
+            <button data-cal="lunar">农历</button>
+          </div>
+          <div class="field-label">出生日期</div>
+          <div class="date-row">
+            <input id="p2-year" type="number" min="1900" max="2100" placeholder="年">
+            <select id="p2-month"></select>
+            <select id="p2-day"></select>
+          </div>
+          <div class="field-label">时辰</div>
+          <select id="p2-shichen"></select>
+        </div>
+
+        <div class="form-note" style="margin-top:6px">晚子时（23:00–24:00）按次日干支计日。出生信息仅保存在本机。</div>
+        <button id="btn-hepan-submit" class="share-btn">开始合盘</button>
+        <button id="btn-hepan-clear" class="clear-link">清除已存合盘</button>
+      </div>
+    </div>
+
+    <!-- 合盘结果 -->
+    <div id="view-hepan-result" class="view hepan-result">
+      <div class="result-inner">
+        <div class="view-topbar">
+          <button class="back-link" data-go="hepan-input">‹ 返回</button>
+          <span class="topbar-title">合盘</span><span></span>
+        </div>
+        <div class="hp-score-card">
+          <div class="hp-score"><span class="num" id="hp-score"></span><span class="hp-band" id="hp-band"></span></div>
+          <div class="hp-relation" id="hp-relation"></div>
+          <div class="hp-date" id="hp-date"></div>
+        </div>
+        <div id="hp-pillars" class="hp-pillars"></div>
+        <section class="analysis-card"><h3>合盘分项</h3><div id="hp-items"></div></section>
+        <section class="analysis-card"><h3>相处之道</h3><div class="txt" id="hp-advice"></div></section>
+        <div class="disclaimer">合盘参考子平框架与生肖冲合之象，仅供文化欣赏与娱乐参考，不构成任何决策建议</div>
+        <button id="btn-hepan-again" class="again" style="margin-top:12px">重新合盘</button>
+      </div>
+    </div>
+
   </div>
   <div id="toast" role="status"></div>
 
@@ -517,7 +655,7 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   // 地支关系：六冲（子午 丑未 寅申 卯酉 辰戌 巳亥）
   const CHONG = { 0: 6, 6: 0, 1: 7, 7: 1, 2: 8, 8: 2, 3: 9, 9: 3, 4: 10, 10: 4, 5: 11, 11: 5 }
   // 六合：子丑 寅亥 卯戌 辰酉 巳申 午未
-  const HE6 = { 0: 1, 1: 0, 2: 11, 11: 2, 3: 9, 9: 3, 4: 8, 8: 4, 5: 7, 7: 5, 6: 6, 10: 10 }
+  const HE6 = { 0: 1, 1: 0, 2: 11, 11: 2, 3: 10, 10: 3, 4: 9, 9: 4, 5: 8, 8: 5, 6: 7, 7: 6 }
   // 三合局：申子辰(水) 巳酉丑(金) 寅午戌(火) 亥卯未(木)
   const SANHE_GROUP = {
     0: [0, 4, 8], 4: [0, 4, 8], 8: [0, 4, 8],
@@ -1477,12 +1615,144 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   }
 
   /* ====================================================================
+   * ⑥b 双人合盘：compatibility 引擎
+   * ==================================================================== */
+  const REL_LABEL = { love: '情侣', work: '事业伙伴', hierarchy: '上下级', all: '综合' }
+  // 关系类型权重（起分 60）
+  const REL_W = {
+    love: { yearHe: 6, yearChong: -8, yearSanhe: 4, yGanHe: 6, dGanHe: 8, dZhiHe: 6, dZhiChong: -10, xiBu: 8, jiBu: -8, daySheng: 6, dayTong: 3, dayKe: -4, xiSame: 5 },
+    work: { yearHe: 3, yearChong: -4, yearSanhe: 2, yGanHe: 3, dGanHe: 5, dZhiHe: 4, dZhiChong: -6, xiBu: 10, jiBu: -10, daySheng: 8, dayTong: 4, dayKe: -3, xiSame: 8 },
+    hierarchy: { yearHe: 2, yearChong: -3, yearSanhe: 2, yGanHe: 2, dGanHe: 4, dZhiHe: 3, dZhiChong: -5, xiBu: 10, jiBu: -10, daySheng: 7, dayTong: 4, dayKe: 0, xiSame: 7 },
+    all: { yearHe: 4, yearChong: -6, yearSanhe: 3, yGanHe: 4, dGanHe: 6, dZhiHe: 5, dZhiChong: -8, xiBu: 9, jiBu: -9, daySheng: 7, dayTong: 4, dayKe: -2, xiSame: 6 }
+  }
+  const HP_BAND = [
+    { min: 85, name: '天作之合', tier: 'high' },
+    { min: 70, name: '情投意合', tier: 'high' },
+    { min: 55, name: '中平之缘', tier: 'mid' },
+    { min: 40, name: '多有磨合', tier: 'low' },
+    { min: 0, name: '殊难相合', tier: 'low' }
+  ]
+  const HP_ADVICE = {
+    love: {
+      high: '两心相印，缘定三生。宜同心同德、坦诚相待，把彼此的喜用能量化为日常扶持。',
+      mid: '有缘相守亦有磨合。宜多沟通、少执拗，把相冲之日支当作了解彼此的课题。',
+      low: '性格与节奏差异较大，相处需更多经营。宜先立界限、再谈深情，慢火熬出默契。'
+    },
+    work: {
+      high: '互补相生，各擅其长。最适合共创事业，宜明确分工、优势互补、利益前置。',
+      mid: '能力可互补，节奏需对齐。宜开诚布公谈目标与分工，避免各自为战。',
+      low: '理念与风格差异较大。合伙宜先立书面约定，权责利分清，方可长久。'
+    },
+    hierarchy: {
+      high: '上下相得，指挥顺畅。上级知人善任，下级乐于执行，是少有的黄金搭档。',
+      mid: '关系尚可，贵在沟通。上级多倾听多授权，下级多汇报多对齐。',
+      low: '禀性差异较大，上下易生隔阂。宜按制度与流程行事，避免情绪化直撞。'
+    },
+    all: {
+      high: '综合缘分较佳，彼此互为助力。宜求同存异，把好缘分用在关键处。',
+      mid: '综合一般，有合有冲。宜扬长避短，规避双方忌神相冲的场合。',
+      low: '综合缘分偏弱，相处需更多用心。保持尊重与适度距离，强求反易生隙。'
+    }
+  }
+  const XIYONG_STRONG = 3.5 // 五行「旺」阈值（wuxing 全盘总量约 15-18）
+  function hePanPair(a, b) { return a !== b && HE6[a] === b }
+  function heSanhe(a, b) { return a !== b && SANHE_GROUP[a] && SANHE_GROUP[a].indexOf(b) >= 0 }
+
+  function compatibility(A, B, relation) {
+    const w = REL_W[relation] || REL_W.all
+    let score = 60
+    const items = []
+    const add = (label, delta, text) => {
+      score += delta
+      items.push({ label, delta, verdict: delta > 0 ? '吉' : delta < 0 ? '凶' : '平', text })
+    }
+    const ayz = A.pillars.year.zhi, byz = B.pillars.year.zhi
+    const adz = A.pillars.day.zhi, bdz = B.pillars.day.zhi
+    const adg = A.pillars.day.gan, bdg = B.pillars.day.gan
+    const ayg = A.pillars.year.gan, byg = B.pillars.year.gan
+
+    if (hePanPair(ayz, byz)) add('生肖六合', w.yearHe, `${ZODIACS[ayz]}与${ZODIACS[byz]}地支六合，根气相亲，初见即有缘。`)
+    else if (heSanhe(ayz, byz)) add('生肖三合', w.yearSanhe, `${ZODIACS[ayz]}与${ZODIACS[byz]}地支三合，气场相契，志趣相近。`)
+    else if (CHONG[ayz] === byz) add('生肖六冲', w.yearChong, `${ZODIACS[ayz]}与${ZODIACS[byz]}地支六冲，个性观念易起碰撞，需多包容。`)
+    else add('生肖', 0, `${ZODIACS[ayz]}与${ZODIACS[byz]}生肖无冲合，平平相处，贵在经营。`)
+
+    if (Math.abs(ayg - byg) === 5) add('年干五合', w.yGanHe, '年柱天干相合，两家门风气度相近，根基相融。')
+    if (Math.abs(adg - bdg) === 5) add('日干五合', w.dGanHe, '日柱天干相合，为合盘最重之一合，两心相悦，志趣易通。')
+
+    if (hePanPair(adz, bdz)) add('日支六合', w.dZhiHe, `日支${BRANCHES[adz]}${BRANCHES[bdz]}相合，生活相处顺遂，羁绊较深。`)
+    else if (CHONG[adz] === bdz) add('日支六冲', w.dZhiChong, `日支${BRANCHES[adz]}${BRANCHES[bdz]}六冲，内在需求易起冲突，宜多沟通化解。`)
+    else add('日支', 0, '日支无合冲，相处平淡，少些波动也少些火花。')
+
+    let bu = 0
+    const buTexts = []
+    A.xiyong.xi.forEach(x => { if (B.wuxing[x] >= XIYONG_STRONG) { bu += w.xiBu; buTexts.push(`甲喜「${x}」而乙局${x}旺`) } })
+    B.xiyong.xi.forEach(x => { if (A.wuxing[x] >= XIYONG_STRONG) { bu += w.xiBu; buTexts.push(`乙喜「${x}」而甲局${x}旺`) } })
+    A.xiyong.ji.forEach(x => { if (B.wuxing[x] >= XIYONG_STRONG) { bu -= Math.abs(w.jiBu); buTexts.push(`甲忌「${x}」而乙局${x}旺`) } })
+    B.xiyong.ji.forEach(x => { if (A.wuxing[x] >= XIYONG_STRONG) { bu -= Math.abs(w.jiBu); buTexts.push(`乙忌「${x}」而甲局${x}旺`) } })
+    bu = Math.max(-12, Math.min(12, bu))
+    if (bu !== 0) add('五行互补', bu, buTexts.join('；') + (bu > 0 ? '，互为补益。' : '，彼此助长忌神，易生消耗。'))
+    else add('五行互补', 0, '双方喜用未见明显互补，贵在各自独立、互相成就。')
+
+    const deA = STEM_EL[adg], deB = STEM_EL[bdg]
+    if (deA === deB) add('日主比和', w.dayTong, `日主同属${ELEMENTS[deA]}，性情相似，容易理解彼此。`)
+    else if (sheng(deA, deB)) add('日主相生', w.daySheng, `甲日主${ELEMENTS[deA]}生乙日主${ELEMENTS[deB]}，甲乐于扶持乙。`)
+    else if (sheng(deB, deA)) add('日主相生', w.daySheng, `乙日主${ELEMENTS[deB]}生甲日主${ELEMENTS[deA]}，乙乐于扶持甲。`)
+    else if (relation === 'hierarchy') add('日主相克', 0, '日主相克，上下互为制衡，分工明确反成助力。')
+    else add('日主相克', w.dayKe, `日主${ELEMENTS[deA]}${ELEMENTS[deB]}相克，气质相抵，须刻意调和。`)
+
+    const sameXi = A.xiyong.xi.filter(x => B.xiyong.xi.indexOf(x) >= 0)
+    if (sameXi.length) add('喜用同气', w.xiSame, `双方同喜${sameXi.join('、')}，人生目标与价值取向相近。`)
+    else add('喜用同气', 0, '双方喜用无交集，各有所求，宜互相尊重差异。')
+
+    score = Math.max(0, Math.min(100, Math.round(score)))
+    const band = HP_BAND.find(b => score >= b.min) || HP_BAND[HP_BAND.length - 1]
+    return { score, band, relation, items, advice: HP_ADVICE[relation][band.tier] }
+  }
+
+  // 合盘渲染
+  const hepanState = { relation: 'love', result: null }
+  function syncRelationSeg() {
+    document.querySelectorAll('#seg-relation button').forEach(b => b.classList.toggle('active', b.dataset.relation === hepanState.relation))
+  }
+  function hepanDateStr(disk) {
+    const b = disk.birth
+    return `${b.y}年${b.m}月${b.d}日${shichenSlotName(b.hour)}`
+  }
+  function hpPillarsHTML(disk, name) {
+    const keys = ['year', 'month', 'day', 'hour']
+    const labels = ['年', '月', '日', '时']
+    const cells = keys.map((k, i) => {
+      const pil = disk.pillars[k]
+      const g = `<span style="color:${WUXING_COLOR[ELEMENTS[STEM_EL[pil.gan]]]}">${STEMS[pil.gan]}</span>`
+      const z = `<span style="color:${WUXING_COLOR[ELEMENTS[BRANCH_EL[pil.zhi]]]}">${BRANCHES[pil.zhi]}</span>`
+      const lbl = k === 'day' ? `${STEMS[disk.dayGan]}命` : labels[i]
+      return `<div class="hp-cell">${g}${z}<small>${lbl}</small></div>`
+    }).join('')
+    return `<div class="hp-row"><div class="hp-name">${name}</div>${cells}</div>`
+  }
+  function renderHepanResult(comp, dA, dB) {
+    $('hp-score').textContent = comp.score
+    $('hp-band').textContent = comp.band.name
+    $('hp-relation').textContent = `${REL_LABEL[comp.relation]}合盘`
+    $('hp-date').textContent = `甲 ${hepanDateStr(dA)}　·　乙 ${hepanDateStr(dB)}`
+    $('hp-pillars').innerHTML = hpPillarsHTML(dA, '甲') + hpPillarsHTML(dB, '乙')
+    $('hp-items').innerHTML = comp.items.map(it => `
+      <div class="hp-item">
+        <span class="hp-item-tag ${it.verdict}">${it.verdict}</span>
+        <span class="hp-item-label">${it.label}</span>
+        <span class="hp-item-text">${it.text}</span>
+        <span class="hp-item-points">${it.delta > 0 ? '+' : ''}${it.delta}</span>
+      </div>`).join('')
+    $('hp-advice').textContent = comp.advice
+  }
+
+  /* ====================================================================
    * ⑦ 页面状态与渲染
    * ==================================================================== */
   let view = 'home' // home | idle | casting | result | bazi-input | bazi-result | fortune
   const app = { displayLines: [], hexagram: null, changed: null, auraText: '', bazi: null, fortune: null }
   const $ = (id) => document.getElementById(id)
-  const VIEWS = ['home', 'idle', 'casting', 'result', 'bazi-input', 'bazi-result', 'fortune']
+  const VIEWS = ['home', 'idle', 'casting', 'result', 'bazi-input', 'bazi-result', 'fortune', 'hepan-input', 'hepan-result']
 
   function setView(next) {
     view = next
@@ -1544,41 +1814,18 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     $('aura').textContent = app.auraText
   }
 
-  // ---- 八字输入表单 ----
-  const formState = { gender: 'male', cal: 'solar', year: new Date().getFullYear(), month: 0, day: 1, shichen: 6 }
+  // ---- 八字输入表单（prefix 通用：bazi 单人 / p1 p2 合盘） ----
+  const FORM_IDS = { year: 'inp-year', month: 'sel-month', day: 'sel-day', shichen: 'sel-shichen', gender: 'seg-gender', cal: 'seg-cal' }
+  function idsFor(prefix) {
+    if (prefix === 'bazi') return FORM_IDS
+    return { year: prefix + '-year', month: prefix + '-month', day: prefix + '-day', shichen: prefix + '-shichen', gender: prefix + '-gender', cal: prefix + '-cal' }
+  }
+  const formState = { prefix: 'bazi', gender: 'male', cal: 'solar', year: new Date().getFullYear(), month: 0, day: 1, shichen: 6 }
+  const hepanP1 = { prefix: 'p1', gender: 'male', cal: 'solar', year: new Date().getFullYear(), month: 0, day: 1, shichen: 6 }
+  const hepanP2 = { prefix: 'p2', gender: 'male', cal: 'solar', year: new Date().getFullYear(), month: 0, day: 1, shichen: 6 }
 
-  function fillShichenSelect() {
-    const sel = $('sel-shichen')
-    sel.innerHTML = SHICHEN_SLOTS.map(([label], i) => `<option value="${i}">${label}</option>`).join('')
-    sel.value = String(formState.shichen)
-  }
-  function fillMonthDay() {
-    const y = formState.year
-    const sm = $('sel-month')
-    const months = monthOptions(y)
-    sm.innerHTML = months.map((mm, i) => `<option value="${i}" data-leap="${mm.leap ? 1 : 0}">${monthLabel(mm)}</option>`).join('')
-    if (formState.month >= months.length) formState.month = months.length - 1
-    sm.value = String(formState.month)
-    fillDays()
-  }
-  function monthLabel(mm) {
-    if (formState.cal === 'lunar') return (mm.leap ? '闰' : '') + CN_MONTH[mm.m - 1] + '月'
-    return mm.m + '月'
-  }
-  function fillDays() {
-    const y = formState.year
-    const sm = $('sel-month')
-    const months = monthOptions(y)
-    const cur = months[sm.selectedIndex]
-    const max = cur.leap ? leapDays(y) : monthDays(y, cur.m)
-    const sd = $('sel-day')
-    sd.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}日</option>`).join('')
-    if (formState.day > max) formState.day = max
-    sd.value = String(formState.day)
-  }
-  // 当前历法下的月份选项（农历含闰月）
-  function monthOptions(y) {
-    if (formState.cal === 'lunar') {
+  function monthOptionsCal(cal, y) {
+    if (cal === 'lunar') {
       const months = []
       for (let i = 1; i <= 12; i++) months.push({ m: i, leap: false })
       const lm = leapMonth(y)
@@ -1587,23 +1834,81 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     }
     return Array.from({ length: 12 }, (_, i) => ({ m: i + 1, leap: false }))
   }
-
-  function fillBaziForm(saved) {
-    if (saved) {
-      formState.gender = saved.gender
-      formState.cal = saved.cal
-      formState.year = saved.year
-      formState.month = saved.month
-      formState.day = saved.day
-      formState.shichen = saved.shichen
-    }
-    // 性别/历法 seg 高亮
-    document.querySelectorAll('#seg-gender button').forEach(b => b.classList.toggle('active', b.dataset.gender === formState.gender))
-    document.querySelectorAll('#seg-cal button').forEach(b => b.classList.toggle('active', b.dataset.cal === formState.cal))
-    $('inp-year').value = String(formState.year)
-    fillShichenSelect()
-    fillMonthDay()
+  function monthLabelCal(cal, mm) {
+    if (cal === 'lunar') return (mm.leap ? '闰' : '') + CN_MONTH[mm.m - 1] + '月'
+    return mm.m + '月'
   }
+  function fillShichenSel(st) {
+    const sel = $(idsFor(st.prefix).shichen)
+    sel.innerHTML = SHICHEN_SLOTS.map(([label], i) => `<option value="${i}">${label}</option>`).join('')
+    sel.value = String(st.shichen)
+  }
+  function fillMonthDaySel(st) {
+    const ids = idsFor(st.prefix)
+    const sm = $(ids.month)
+    const months = monthOptionsCal(st.cal, st.year)
+    sm.innerHTML = months.map((mm, i) => `<option value="${i}" data-leap="${mm.leap ? 1 : 0}">${monthLabelCal(st.cal, mm)}</option>`).join('')
+    if (st.month >= months.length) st.month = months.length - 1
+    sm.value = String(st.month)
+    fillDaysSel(st)
+  }
+  function fillDaysSel(st) {
+    const ids = idsFor(st.prefix)
+    const sm = $(ids.month)
+    const months = monthOptionsCal(st.cal, st.year)
+    const cur = months[sm.selectedIndex]
+    const max = cur.leap ? leapDays(st.year) : monthDays(st.year, cur.m)
+    const sd = $(ids.day)
+    sd.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}日</option>`).join('')
+    if (st.day > max) st.day = max
+    sd.value = String(st.day)
+  }
+  function fillPersonForm(st, saved) {
+    if (saved) {
+      st.gender = saved.gender
+      st.cal = saved.cal
+      st.year = saved.year
+      st.month = saved.month
+      st.day = saved.day
+      st.shichen = saved.shichen
+    }
+    const ids = idsFor(st.prefix)
+    document.querySelectorAll(`#${ids.gender} button`).forEach(b => b.classList.toggle('active', b.dataset.gender === st.gender))
+    document.querySelectorAll(`#${ids.cal} button`).forEach(b => b.classList.toggle('active', b.dataset.cal === st.cal))
+    $(ids.year).value = String(st.year)
+    fillShichenSel(st)
+    fillMonthDaySel(st)
+  }
+  // 读取表单：返回 { gender, cal, year, month, day, shichen, solar:{y,m,d}, hour, minute } 或 null
+  function readPersonForm(st) {
+    const ids = idsFor(st.prefix)
+    const isLunar = st.cal === 'lunar'
+    const y = parseInt($(ids.year).value, 10) || st.year
+    if (y < 1900 || y > 2100) { toast('年份需在 1900–2100 之间'); return null }
+    const sm = $(ids.month)
+    const mIdx = sm.selectedIndex + 1
+    const d = parseInt($(ids.day).value, 10) || 1
+    const shiIdx = parseInt($(ids.shichen).value, 10) || 0
+    let hour = shiIdx * 2, minute = 30
+    if (shiIdx === 12) { hour = 23; minute = 30 }
+    let sy = y, smm, sdd
+    if (isLunar) {
+      const cur = monthOptionsCal('lunar', y)[sm.selectedIndex]
+      if (!cur) { toast('农历月份数据异常'); return null }
+      const s = lunar2solar(y, cur.m, d, cur.leap)
+      sy = s.y; smm = s.m; sdd = s.d
+    } else {
+      smm = mIdx; sdd = d
+    }
+    return { gender: st.gender, cal: isLunar ? 'lunar' : 'solar', year: y, month: sm.selectedIndex, day: d, shichen: shiIdx, solar: { y: sy, m: smm, d: sdd }, hour, minute }
+  }
+  // 适配层：保留旧函数名，单人流程行为不变
+  const fillShichenSelect = () => fillShichenSel(formState)
+  const fillMonthDay = () => fillMonthDaySel(formState)
+  const fillDays = () => fillDaysSel(formState)
+  const monthOptions = (y) => monthOptionsCal(formState.cal, y)
+  const monthLabel = (mm) => monthLabelCal(formState.cal, mm)
+  const fillBaziForm = (saved) => fillPersonForm(formState, saved)
 
   // ---- 命盘渲染 ----
   function renderBaziResult(disk, analysis) {
@@ -1766,36 +2071,14 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
 
   // 提交排盘
   function onSubmitBazi() {
-    const gender = formState.gender
-    const isLunar = formState.cal === 'lunar'
-    const y = parseInt($('inp-year').value, 10) || formState.year
-    if (y < 1900 || y > 2100) { toast('年份需在 1900–2100 之间'); return }
-    const sm = $('sel-month')
-    const opt = sm.options[sm.selectedIndex]
-    const leap = opt && opt.dataset.leap === '1'
-    const mIdx = sm.selectedIndex + 1
-    const d = parseInt($('sel-day').value, 10) || 1
-    const shiIdx = parseInt($('sel-shichen').value, 10) || 0
-    // 时辰段 → 代表时刻
-    let hour = shiIdx * 2, minute = 30
-    if (shiIdx === 12) { hour = 23; minute = 30 }
-
-    let sy = y, smm, sdd
-    if (isLunar) {
-      const cur = monthOptions(y)[sm.selectedIndex]
-      if (!cur) { toast('农历月份数据异常'); return }
-      const s = lunar2solar(y, cur.m, d, cur.leap)
-      sy = s.y; smm = s.m; sdd = s.d
-    } else {
-      smm = mIdx; sdd = d
-    }
-
+    const r = readPersonForm(formState)
+    if (!r) return
     try {
-      const disk = buildBazi({ y: sy, m: smm, d: sdd, hour, minute, gender })
+      const disk = buildBazi({ y: r.solar.y, m: r.solar.m, d: r.solar.d, hour: r.hour, minute: r.minute, gender: r.gender })
       const analysis = buildAnalysis(disk)
       app.bazi = disk
-      formState.year = y; formState.month = sm.selectedIndex; formState.day = d
-      saveBazi({ gender, cal: isLunar ? 'lunar' : 'solar', year: y, month: sm.selectedIndex, day: d, shichen: shiIdx, disk })
+      formState.year = r.year; formState.month = r.month; formState.day = r.day
+      saveBazi({ gender: r.gender, cal: r.cal, year: r.year, month: r.month, day: r.day, shichen: r.shichen, disk })
       renderBaziResult(disk, analysis)
       setView('bazi-result')
     } catch (e) {
@@ -1816,13 +2099,59 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     if (app.bazi) { renderBaziResult(app.bazi, buildAnalysis(app.bazi)); setView('bazi-result') }
     else { fillBaziForm(); setView('bazi-input') }
   })
+  $('btn-card-hepan').addEventListener('click', () => {
+    if (hepanState.result) {
+      renderHepanResult(hepanState.result.comp, hepanState.result.dA, hepanState.result.dB)
+      setView('hepan-result')
+    } else {
+      const bSaved = loadBazi()
+      fillPersonForm(hepanP1, bSaved ? toFormInput(bSaved) : null)
+      fillPersonForm(hepanP2, null)
+      syncRelationSeg()
+      setView('hepan-input')
+    }
+  })
   document.querySelectorAll('.back-link').forEach(btn => {
     btn.addEventListener('click', () => {
       const go = btn.dataset.go
       if (go === 'bazi-result') setView('bazi-result')
+      else if (go === 'hepan-input') setView('hepan-input')
       else goHome()
     })
   })
+  // 合盘
+  $('seg-relation').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    hepanState.relation = b.dataset.relation
+    document.querySelectorAll('#seg-relation button').forEach(x => x.classList.toggle('active', x === b))
+  })
+  $('btn-hepan-submit').addEventListener('click', () => {
+    const rA = readPersonForm(hepanP1)
+    if (!rA) return
+    const rB = readPersonForm(hepanP2)
+    if (!rB) return
+    try {
+      const dA = buildBazi({ y: rA.solar.y, m: rA.solar.m, d: rA.solar.d, hour: rA.hour, minute: rA.minute, gender: rA.gender })
+      const dB = buildBazi({ y: rB.solar.y, m: rB.solar.m, d: rB.solar.d, hour: rB.hour, minute: rB.minute, gender: rB.gender })
+      const rel = hepanState.relation
+      const comp = compatibility(dA, dB, rel)
+      hepanState.result = { comp, dA, dB }
+      saveHepan({ relation: rel, inputA: rA, inputB: rB })
+      renderHepanResult(comp, dA, dB)
+      updateHomeCard()
+      setView('hepan-result')
+    } catch (e) {
+      console.error(e)
+      toast('合盘失败，请检查输入')
+    }
+  })
+  $('btn-hepan-clear').addEventListener('click', () => {
+    clearHepan()
+    updateHomeCard()
+    toast('已清除')
+  })
+  $('btn-hepan-again').addEventListener('click', () => setView('hepan-input'))
   $('btn-cast').addEventListener('click', onCast)
   $('btn-again').addEventListener('click', onAgain)
   $('btn-share').addEventListener('click', onShare)
@@ -1831,31 +2160,37 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   $('btn-fortune').addEventListener('click', goFortune)
   $('btn-rerun').addEventListener('click', () => { fillBaziForm(); setView('bazi-input') })
 
-  // 性别/历法 seg
-  $('seg-gender').addEventListener('click', (e) => {
-    const b = e.target.closest('button')
-    if (!b) return
-    formState.gender = b.dataset.gender
-    document.querySelectorAll('#seg-gender button').forEach(x => x.classList.toggle('active', x === b))
-  })
-  $('seg-cal').addEventListener('click', (e) => {
-    const b = e.target.closest('button')
-    if (!b) return
-    formState.cal = b.dataset.cal
-    document.querySelectorAll('#seg-cal button').forEach(x => x.classList.toggle('active', x === b))
-    fillMonthDay()
-  })
-  $('inp-year').addEventListener('change', () => {
-    let v = parseInt($('inp-year').value, 10)
-    if (isNaN(v)) v = new Date().getFullYear()
-    v = Math.max(1900, Math.min(2100, v))
-    $('inp-year').value = String(v)
-    formState.year = v
-    fillMonthDay()
-  })
-  $('sel-month').addEventListener('change', fillDays)
-  $('sel-day').addEventListener('change', () => { formState.day = parseInt($('sel-day').value, 10) })
-  $('sel-shichen').addEventListener('change', () => { formState.shichen = parseInt($('sel-shichen').value, 10) })
+  // 单人 + 合盘甲乙 表单事件（prefix 通用）
+  function bindPersonForm(st) {
+    const ids = idsFor(st.prefix)
+    $(ids.gender).addEventListener('click', (e) => {
+      const b = e.target.closest('button')
+      if (!b) return
+      st.gender = b.dataset.gender
+      document.querySelectorAll(`#${ids.gender} button`).forEach(x => x.classList.toggle('active', x === b))
+    })
+    $(ids.cal).addEventListener('click', (e) => {
+      const b = e.target.closest('button')
+      if (!b) return
+      st.cal = b.dataset.cal
+      document.querySelectorAll(`#${ids.cal} button`).forEach(x => x.classList.toggle('active', x === b))
+      fillMonthDaySel(st)
+    })
+    $(ids.year).addEventListener('change', () => {
+      let v = parseInt($(ids.year).value, 10)
+      if (isNaN(v)) v = new Date().getFullYear()
+      v = Math.max(1900, Math.min(2100, v))
+      $(ids.year).value = String(v)
+      st.year = v
+      fillMonthDaySel(st)
+    })
+    $(ids.month).addEventListener('change', () => fillDaysSel(st))
+    $(ids.day).addEventListener('change', () => { st.day = parseInt($(ids.day).value, 10) })
+    $(ids.shichen).addEventListener('change', () => { st.shichen = parseInt($(ids.shichen).value, 10) })
+  }
+  bindPersonForm(formState)
+  bindPersonForm(hepanP1)
+  bindPersonForm(hepanP2)
 
   // 运势 Tab 与翻页
   $('fortune-tabs').addEventListener('click', (e) => {
@@ -1905,6 +2240,39 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   }
   function updateHomeCard() {
     $('card-bazi-sub').textContent = app.bazi ? '查看我的命盘' : '子平四柱 · 观命析运'
+    $('card-hepan-sub').textContent = hepanState.result ? '查看我的合盘' : '姻缘合作 · 观合知处'
+  }
+
+  // 合盘持久化（只存输入，加载时重跑引擎）
+  const HEPAN_KEY = 'xl_yg_hepan'
+  function saveHepan(data) {
+    try { localStorage.setItem(HEPAN_KEY, JSON.stringify({ v: 1, ...data, savedAt: Date.now() })) } catch (e) { /* 隐私模式忽略 */ }
+  }
+  function loadHepan() {
+    try {
+      const raw = localStorage.getItem(HEPAN_KEY)
+      if (!raw) return null
+      const data = JSON.parse(raw)
+      if (data && data.v === 1 && data.inputA && data.inputB) return data
+    } catch (e) { /* 忽略 */ }
+    return null
+  }
+  function clearHepan() {
+    hepanState.result = null
+    try { localStorage.removeItem(HEPAN_KEY) } catch (e) { /* 忽略 */ }
+  }
+  function toFormInput(r) {
+    return { gender: r.gender, cal: r.cal, year: r.year, month: r.month, day: r.day, shichen: r.shichen }
+  }
+  function rebuildHepan(saved) {
+    try {
+      const rA = saved.inputA, rB = saved.inputB
+      const dA = buildBazi({ y: rA.solar.y, m: rA.solar.m, d: rA.solar.d, hour: rA.hour, minute: rA.minute, gender: rA.gender })
+      const dB = buildBazi({ y: rB.solar.y, m: rB.solar.m, d: rB.solar.d, hour: rB.hour, minute: rB.minute, gender: rB.gender })
+      hepanState.relation = saved.relation
+      hepanState.result = { comp: compatibility(dA, dB, saved.relation), dA, dB }
+      return true
+    } catch (e) { return false }
   }
 
   /* ====================================================================
@@ -1916,13 +2284,24 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
     })
   }
 
-  // 初始化：恢复已存命盘，预填表单
+  // 初始化：恢复已存命盘 / 合盘，预填表单
   const saved = loadBazi()
+  const savedBaziInput = saved ? toFormInput(saved) : null
+  const savedHepan = loadHepan()
+  if (savedHepan) {
+    rebuildHepan(savedHepan)
+    fillPersonForm(hepanP1, toFormInput(savedHepan.inputA))
+    fillPersonForm(hepanP2, toFormInput(savedHepan.inputB))
+  } else {
+    fillPersonForm(hepanP1, savedBaziInput)
+    fillPersonForm(hepanP2, null)
+  }
+  syncRelationSeg()
   updateHomeCard()
   fillShichenSelect()
   fillMonthDay()
 
-  window.__debug = { hash, mulberry32, cast, buildAura, computePillars, buildBazi, buildAnalysis, dayPillarIndex, getYearTerms, solar2lunar, lunar2solar, shiShen }
+  window.__debug = { hash, mulberry32, cast, buildAura, computePillars, buildBazi, buildAnalysis, dayPillarIndex, getYearTerms, solar2lunar, lunar2solar, shiShen, compatibility, readPersonForm, HE6, REL_W, HP_BAND }
 
 })()
 </script>
